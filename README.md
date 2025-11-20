@@ -1,1 +1,6 @@
-# feishu_oneid_web_app_js
+## 安装依赖
+`npm install`
+
+## 启动运行
+`npm run start`
+
