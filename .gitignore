@@ -38,3 +38,9 @@ next-env.d.ts
 # config
 client_config.js
 server_config.js
+
+# logs
+/logs/*
+
+# data
+/data/*.db

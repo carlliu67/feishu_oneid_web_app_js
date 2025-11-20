@@ -29,7 +29,7 @@
   },
   "scripts": {
     "start": "npm run start:server & npm run start:web",
-    "start:web": "PORT=3000 BROWSER=none react-scripts start",
+    "start:web": "PORT=9001 BROWSER=none react-scripts start",
     "start:server": "node ./server/server.js",
     "build": "react-scripts build"
   },
