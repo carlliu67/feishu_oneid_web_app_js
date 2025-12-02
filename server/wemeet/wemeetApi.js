@@ -6,7 +6,7 @@ import serverConfig from '../config/server_config.js';
 import { isLogin, getUserid } from '../feishuapi/feishuAuth.js';
 
 const LJ_TOKEN_KEY = 'lk_token';
-const WEMEET_VERSION = 'wemeet-dingtalk-js/v1.0.1'
+const WEMEET_VERSION = 'wemeet-feishu-js/v1.0.1'
 
 /**
  * 生成签名函数
@@ -104,8 +104,9 @@ function handleApiError(error, apiName) {
 async function queryMeetingById(meetingId, userid) {
     const uri = `/v1/meetings/${meetingId}?userid=${userid}&instanceid=1`;
     
+    let requestConfig = null;
     try {
-        const requestConfig = createRequestConfig('GET', uri);
+        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询会议请求配置: ", requestConfig);
 
         const response = await axios(requestConfig);
@@ -128,8 +129,9 @@ async function queryMeetingRecordList(webhookMeetingInfo) {
     const timestamp = Math.floor(Date.now() / 1000);
     const uri = `/v1/records?meeting_id=${webhookMeetingInfo.meeting_id}&start_time=${startTime}&end_time=${timestamp}&operator_id=${webhookMeetingInfo.creator.userid}&operator_id_type=1`;
 
+    let requestConfig = null;
     try {
-        const requestConfig = createRequestConfig('GET', uri);
+        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询会议录制列表请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -152,8 +154,9 @@ async function queryMeetingRecordList(webhookMeetingInfo) {
 async function queryMeetingRecordAddress(meeting_record_id, userid) {
     const uri = `/v1/addresses?meeting_record_id=${meeting_record_id}&userid=${userid}`;
 
+    let requestConfig = null;
     try {
-        const requestConfig = createRequestConfig('GET', uri);
+        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询会议录制地址请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -175,8 +178,9 @@ async function queryMeetingRecordAddress(meeting_record_id, userid) {
 async function queryMeetingParticipants(meeting_id, userid) {
     const uri = `/v1/meetings/${meeting_id}/participants?userid=${userid}&size=100`;
 
+    let requestConfig = null;
     try {
-        const requestConfig = createRequestConfig('GET', uri);
+        requestConfig = createRequestConfig('GET', uri);
         logger.debug("获取参会成员明细请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -262,8 +266,9 @@ async function handleQueryUserEndedMeetingList(ctx) {
 
     const uri = `/v1/history/meetings/${getUserid(ctx)}?page_size=${page_size}&page=${page}`;
 
+    let requestConfig = null;
     try {
-        const requestConfig = createRequestConfig('GET', uri);
+        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询用户已结束会议列表请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -306,8 +311,9 @@ async function handleQueryUserMeetingList(ctx) {
 
     const uri = `/v1/meetings?userid=${getUserid(ctx)}&instanceid=1`;
 
+    let requestConfig = null;
     try {
-        const requestConfig = createRequestConfig('GET', uri);
+        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询用户会议列表请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);

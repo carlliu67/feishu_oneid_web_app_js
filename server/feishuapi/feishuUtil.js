@@ -1,4 +1,4 @@
-import serverConfig from '../server_config.js';
+import serverConfig from '../config/server_config.js';
 
 // 生成Applink
 function genH5AppLinkMeetingCode(meetingCode) {

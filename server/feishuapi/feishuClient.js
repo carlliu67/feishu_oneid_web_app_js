@@ -1,5 +1,5 @@
 import lark from '@larksuiteoapi/node-sdk';
-import serverConfig from '../server_config.js'; // 导入 serverConfig
+import serverConfig from '../config/server_config.js'; // 导入 serverConfig
 
 const client = new lark.Client({
     appId: serverConfig.feishuAppId,

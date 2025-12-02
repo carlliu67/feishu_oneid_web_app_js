@@ -2,7 +2,7 @@ import CryptoJS from 'crypto-js';
 import axios from 'axios';
 
 import { logger } from '../util/logger.js';
-import serverConfig from '../server_config.js'; // 根据实际路径调整
+import serverConfig from '../config/server_config.js'; // 根据实际路径调整
 import { configAccessControl, okResponse, failResponse, setCookie } from '../server_util.js';
 
 const LJ_JSTICKET_KEY = 'lk_jsticket'

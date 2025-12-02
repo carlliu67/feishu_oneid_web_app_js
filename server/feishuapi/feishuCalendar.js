@@ -1,4 +1,4 @@
-import serverConfig from '../server_config.js';
+import serverConfig from '../config/server_config.js';
 import lark from '@larksuiteoapi/node-sdk';
 import axios from 'axios';
 import { logger } from '../util/logger.js';
