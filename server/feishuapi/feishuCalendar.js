@@ -152,16 +152,16 @@ async function addCalendarAttendees(tenant_access_token, calendar_id, event_id, 
 }
 
 // 创建会议日程
-async function createMeetingCalendar(meetingInfo, attendees) {
+async function createMeetingCalendar(creatorUserId, meetingInfo, attendees) {
     const tenant_access_token = await getTenantAccessToken();
     const calendar_list = await getCalendarList(tenant_access_token);
     logger.debug("calendar_list: ", calendar_list);
     const calendarId = getPrimaryCalendarId(Array.from(calendar_list));
-    logger.info(calendarId);
+    logger.debug("calendarId: ", calendarId);
     const event_id = await createCalendar(tenant_access_token, calendarId, meetingInfo);
     const status = await addCalendarAttendees(tenant_access_token, calendarId, event_id, attendees);
     if (status === 0) {
-        logger.info("添加日程参与人成功");
+        logger.debug("添加日程参与人成功");
     }
 }
 
