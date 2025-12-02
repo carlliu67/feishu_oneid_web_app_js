@@ -163,9 +163,10 @@ function requestUserAccessToken(code, complete) {
 
 export function getOrigin(apiPort) {
     // console.log('process.env', process.env)
-    let hostname = window.location.hostname
-    return `http://${hostname}:${apiPort}`
+    if (clientConfig.serverUrl && clientConfig.serverUrl.length > 0) {
+        return clientConfig.serverUrl + ":" + apiPort
+    } else {
+        let hostname = window.location.hostname
+        return clientConfig.serverProtocol + `://${hostname}:${apiPort}`
+    }
 }
-
-
-

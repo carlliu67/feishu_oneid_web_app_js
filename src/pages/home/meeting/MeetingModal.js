@@ -12,17 +12,10 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     const now = dayjs();
     const currentMinutes = now.minute();
     const remainder = currentMinutes % 15;
-    const minutesToAdd = remainder > 0 ? 15 - remainder : 0;
+    const minutesToAdd = 30 - remainder;
     return now.add(minutesToAdd, 'minute');
   });
   const formRef = useRef(null);
-  const [startTime, setStartTime] = useState(() => { // 使用状态变量存储开始时间，初始计算未来最近的15分钟间隔
-    const now = dayjs();
-    const currentMinutes = now.minute();
-    const remainder = currentMinutes % 15;
-    const minutesToAdd = remainder > 0 ? 15 - remainder : 0;
-    return now.add(minutesToAdd, 'minute').toDate();
-  });
 
   // 使用useEffect监听visible属性变化，确保每次Modal显示时都更新时间
   useEffect(() => {
@@ -31,16 +24,15 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
       const now = dayjs();
       const currentMinutes = now.minute();
       const remainder = currentMinutes % 15;
-      const minutesToAdd = remainder > 0 ? 15 - remainder : 0;
+      const minutesToAdd = 30 - remainder;
       const adjustedTime = now.add(minutesToAdd, 'minute');
-
+      
       console.log('Modal visible, updating time to:', adjustedTime.format('HH:mm'));
-
+      
       // 更新状态变量
       setCurrentDate(now.startOf('day'));
       setCurrentTime(adjustedTime);
-      setStartTime(adjustedTime.toDate());
-
+      
       // 延迟执行以确保formRef已初始化
       setTimeout(() => {
         if (formRef.current) {
@@ -57,20 +49,19 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     // 使用新的变量名避免混淆
     const newNow = dayjs();
     const newDate = newNow.startOf('day');
-
+    
     // 计算未来最近的15分钟间隔时间
     const currentMinutes = newNow.minute();
     const remainder = currentMinutes % 15;
     const minutesToAdd = remainder > 0 ? 15 - remainder : 0;
     const adjustedTime = newNow.add(minutesToAdd, 'minute');
-
+    
     console.log('showModal called, current time:', newNow.format('HH:mm'), 'adjusted to:', adjustedTime.format('HH:mm'));
-
+    
     // 更新状态变量，触发组件重新渲染
     setCurrentDate(newDate);
     setCurrentTime(adjustedTime);
-    setStartTime(adjustedTime.toDate());
-
+    
     // 强制更新表单值
     if (formRef.current) {
       // 先重置表单，确保清除之前的值
@@ -94,10 +85,10 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
   const handleRemoveHost = (index) => {
     // 创建新的主持人列表副本，避免直接修改状态
     const newSelectedHosts = [...selectedHosts];
-
+    
     // 移除指定索引的主持人
     newSelectedHosts.splice(index, 1);
-
+    
     // 更新状态
     setSelectedHosts(newSelectedHosts);
   };
@@ -106,10 +97,10 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
   const handleRemoveInvitee = (index) => {
     // 创建新的邀请人列表副本，避免直接修改状态
     const newSelectedInvitees = [...selectedInvitees];
-
+    
     // 移除指定索引的邀请人
     newSelectedInvitees.splice(index, 1);
-
+    
     // 更新状态
     setSelectedInvitees(newSelectedInvitees);
   };

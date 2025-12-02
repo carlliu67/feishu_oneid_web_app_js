@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
 import { CookieJar } from 'tough-cookie';
 import { logger } from '../util/logger.js';
-import serverConfig from '../server_config.js';
+import serverConfig from '../config/server_config.js';
 import { configAccessControl, okResponse, failResponse } from '../server_util.js';
-import { dbGetIdToken, dbDeleteIdToken, dbInsertIdToken } from '../db/sqlite.js';
+import dbAdapter from '../db/db_adapter.js';
+const { dbGetIdToken, dbDeleteIdToken, dbInsertIdToken } = dbAdapter;
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
@@ -11,23 +12,77 @@ import { isLogin, getUserid } from '../feishuapi/feishuAuth.js';
 
 const LJ_TOKEN_KEY = 'lk_token'
 
-// 生成IDToken
-async function generateIDToken(userid) {
+// 生成IDToken for IDaaS
+async function generateIDTokenIDaaS(userid) {
     var idToken
     var currentTime = Math.floor(Date.now() / 1000);
     var data = await dbGetIdToken(userid);
-    if (data) {
-        if (data.expired > currentTime + 30) {
+
+    // 添加更健壮的类型检查，确保data是对象且有expired属性
+    if (data && typeof data === 'object' && data.expired !== undefined) {
+        if (data.expired > currentTime + 24 * 60 * 60) {
             idToken = data.idToken;
-            logger.info("idToken: ", idToken);
+            logger.debug("idToken: ", idToken);
             return idToken;
         } else {
-            dbDeleteIdToken(userid);
+            // 直接调用dbDeleteIdToken，但添加错误处理
+            dbDeleteIdToken(userid).catch(err => {
+                logger.error("删除过期idToken失败:", err);
+            });
         }
+    } else {
+        logger.debug("dbGetIdToken返回无效数据:", data);
+    }
+    var expired = currentTime + (30 * 24 * 60 * 60) // 过期时间为30天;
+    // 拼接 key 目录下的 rsa_private_key.pem 文件的完整路径
+    const privateKeyPath = path.join(process.cwd(), 'server', 'config', 'rsa_private_key.pem');
+    // 读取私钥文件
+    const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
+    // 定义 JWT 负载
+    const payload = {
+        aud: 'TencentMeeting',
+        sub: userid,
+        iss: 'meeting',
+        iat: Math.floor(Date.now() / 1000), // 生成时间
+        exp: expired
+    };
+    // 定义 JWT 头部
+    const header = {
+        kid: 'meeting###',
+        typ: 'JWT',
+        alg: 'RS256'
+    };
+    // 生成 JWT 串
+    idToken = jwt.sign(payload, privateKey, { algorithm: 'RS256', header: header });
+    dbInsertIdToken(userid, idToken, expired);
+    logger.debug("idToken: ", idToken);
+    return idToken;
+}
+
+// 生成IDToken for Oneid
+async function generateIDTokenOneid(userid) {
+    var idToken
+    var currentTime = Math.floor(Date.now() / 1000);
+    var data = await dbGetIdToken(userid);
+    // 添加更健壮的类型检查，确保data是对象且有expired属性
+    if (data && typeof data === 'object' && data.expired !== undefined) {
+        // oneid idToken过期时间为300秒，超过这个有效期说明不是有效的idToken
+        if (data.expired > currentTime + 30 && data.expired <= currentTime + 300) {
+            idToken = data.idToken;
+            logger.debug("idToken: ", idToken);
+            return idToken;
+        } else {
+            // 直接调用dbDeleteIdToken，但添加错误处理
+            dbDeleteIdToken(userid).catch(err => {
+                logger.error("删除过期idToken失败:", err);
+            });
+        }
+    } else {
+        logger.debug("dbGetIdToken返回无效数据:", data);
     }
     var expired = currentTime + 300 // 过期时间为300秒;
     // 拼接 key 目录下的 rsa_private_key.pem 文件的完整路径
-    const privateKeyPath = path.join(process.cwd(), 'server', 'key', 'rsa_private_key.pem');
+    const privateKeyPath = path.join(process.cwd(), 'server', 'config', 'rsa_private_key.pem');
     // 读取私钥文件
     const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
     // 定义 JWT 负载
@@ -48,15 +103,37 @@ async function generateIDToken(userid) {
     // 生成 JWT 串
     idToken = jwt.sign(payload, privateKey, { algorithm: 'RS256', header: header });
     dbInsertIdToken(userid, idToken, expired);
-    logger.info("idToken: ", idToken);
+    logger.debug("idToken: ", idToken);
     return idToken;
+}
+
+// 根据wemeetSSOURL决定调用哪个IDToken生成函数
+async function generateIDToken(userid) {
+    // 检查serverConfig.wemeetSSOURL是否包含id.meeting.qq.com字符串
+    if (serverConfig.wemeetSSOURL && serverConfig.wemeetSSOURL.includes('id.meeting.qq.com')) {
+        logger.debug('使用generateIDTokenIDaaS生成IDToken');
+        return await generateIDTokenIDaaS(userid);
+    } else {
+        logger.debug('使用generateIDTokenOneid生成IDToken');
+        return await generateIDTokenOneid(userid);
+    }
+}
+
+// 根据wemeetSSOURL决定如何处理action参数
+function processActionParam(actionParam) {
+    // 检查serverConfig.wemeetSSOURL是否包含id.meeting.qq.com字符串
+    if (serverConfig.wemeetSSOURL && serverConfig.wemeetSSOURL.includes('id.meeting.qq.com')) {
+        return Buffer.from(actionParam).toString('base64');
+    } else {
+        return encodeURIComponent(actionParam); ;
+    }
 }
 
 // 提取公共部分
 async function generateUrl(urlString, userid, action) {
     const idToken = await generateIDToken(userid);
-    // logger.info(`idToken: ${idToken}`);
-    logger.info(`urlString: ${urlString}`);
+    // logger.debug(`idToken: ${idToken}`);
+    logger.debug(`urlString: ${urlString}`);
 
     // 免登前缀（固定字符串）
     const SdkUrl = serverConfig.wemeetSSOURL;
@@ -70,12 +147,11 @@ async function generateUrl(urlString, userid, action) {
         }
     });
 
-    // Base64编码（JS内置方法）
-    const meetingBase64 = Buffer.from(meetingSource).toString('base64');
+    const encoded = processActionParam(meetingSource);
 
     // 拼接免登链接（模板字符串优化可读性）
-    const joinUrl = `${SdkUrl}?action=${meetingBase64}&id_token=${idToken}`;
-    logger.info(`免登入会链接 ${joinUrl}`);
+    const joinUrl = `${SdkUrl}?action=${encoded}&id_token=${idToken}`;
+    logger.debug(`免登入会链接 ${joinUrl}`);
 
     return joinUrl;
 }
@@ -85,8 +161,8 @@ async function generateJumpUrl(base64EncodedMeetingUrl, userid) {
     const urlString = Buffer.from(base64EncodedMeetingUrl, 'base64').toString('utf-8');
     // return await generateUrl(urlString, userid, 'jump');
     const idToken = await generateIDToken(userid);
-    // logger.info(`idToken: ${idToken}`);
-    logger.info(`urlString: ${urlString}`);
+    // logger.debug(`idToken: ${idToken}`);
+    logger.debug(`urlString: ${urlString}`);
 
     // 免登前缀（固定字符串）
     const SdkUrl = serverConfig.wemeetSSOURL;
@@ -100,15 +176,11 @@ async function generateJumpUrl(base64EncodedMeetingUrl, userid) {
         }
     });
 
-    // Base64编码（JS内置方法）
-    // const meetingBase64 = Buffer.from(meetingSource).toString('base64');
-
-    // URL encode
-    const encoded = encodeURIComponent(meetingSource); 
+    const encoded = processActionParam(meetingSource); 
 
     // 拼接免登链接（模板字符串优化可读性）
     const joinUrl = `${SdkUrl}?id_token=${idToken}&action=${encoded}`;
-    logger.info(`免登入会链接 ${joinUrl}`);
+    logger.debug(`免登入会链接 ${joinUrl}`);
 
     return joinUrl;
 }
@@ -117,8 +189,8 @@ async function generateJumpUrl(base64EncodedMeetingUrl, userid) {
 async function generateJoinUrl(urlString, userid) {
     //return await generateUrl(urlString, userid, 'join');
     const idToken = await generateIDToken(userid);
-    // logger.info(`idToken: ${idToken}`);
-    logger.info(`urlString: ${urlString}`);
+    // logger.debug(`idToken: ${idToken}`);
+    logger.debug(`urlString: ${urlString}`);
 
     // 免登前缀（固定字符串）
     const SdkUrl = serverConfig.wemeetSSOURL;
@@ -132,27 +204,23 @@ async function generateJoinUrl(urlString, userid) {
         }
     });
 
-    // Base64编码（JS内置方法）
-    // const meetingBase64 = Buffer.from(meetingSource).toString('base64');
-
-    // URL encode
-    const encoded = encodeURIComponent(meetingSource); 
+    const encoded = processActionParam(meetingSource); 
 
     // 拼接免登链接（模板字符串优化可读性）
     const joinUrl = `${SdkUrl}?id_token=${idToken}&action=${encoded}`;
-    logger.info(`免登入会链接 ${joinUrl}`);
+    logger.debug(`免登入会链接 ${joinUrl}`);
 
     return joinUrl;
 }
 
 //处理生成scheme免登url请求
 async function handleGenerateJoinScheme(ctx) {
-    logger.info("\n-------------------[获取scheme免登url BEGIN]-----------------------------");
+    logger.debug("\n-------------------[获取scheme免登url BEGIN]-----------------------------");
     configAccessControl(ctx);
 
     if (isLogin(ctx) === false) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.info("-------------------[获取scheme免登url 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[获取scheme免登url 用户未登录 END]-----------------------------\n");
         return;
     }
 
@@ -171,14 +239,20 @@ async function handleGenerateJoinScheme(ctx) {
         });
 
         var redirectUrl = response.headers.get('location');
-        logger.info("redirectUrl: " + redirectUrl);
+        logger.debug("redirectUrl: " + redirectUrl);
+        // 如果redirectUrl为null，说明没有更多重定向，退出循环
+        if (!redirectUrl) {
+            logger.warn("No redirect URL found, exiting loop");
+            break;
+        }
+        // 添加对redirectUrl为null的检查
         if (redirectUrl.includes('user_code')) {
             const urlParams = new URLSearchParams(redirectUrl.split('?')[1]);
             userCode = urlParams.get('user_code');
-            logger.info("user_code: " + userCode);
+            logger.debug("user_code: " + userCode);
             break;
         }
-
+        
         // 更新 Cookie
         const setCookieHeaders = response.headers.getSetCookie();
         if (setCookieHeaders) {
@@ -186,11 +260,11 @@ async function handleGenerateJoinScheme(ctx) {
                 await cookieJar.setCookie(cookieHeader, initialUrl);
             }
         }
-
+        
         // 处理重定向
         if ([302, 303].includes(response.status)) {
             redirectUrl = response.headers.get('location');
-            logger.info(`Redirecting to: ${redirectUrl}`);
+            logger.debug(`Redirecting to: ${redirectUrl}`);
             initialUrl = redirectUrl;
             continue;
         } else {
@@ -206,8 +280,8 @@ async function handleGenerateJoinScheme(ctx) {
         }
         
         ctx.body = okResponse(schemeUrl);
-        logger.info("schemeUrl: " + schemeUrl);
-        logger.info("-------------------[获取scheme免登url END]-----------------------------\n");
+        logger.debug("schemeUrl: " + schemeUrl);
+        logger.debug("-------------------[获取scheme免登url END]-----------------------------\n");
     } else {
         ctx.body = failResponse("generate scheme url fail");
         logger.error("-------------------[获取scheme免登url END]-----------------------------\n");
@@ -216,12 +290,12 @@ async function handleGenerateJoinScheme(ctx) {
 
 //处理生成免登跳转链接请求
 async function handleGenerateJumpUrl(ctx) {
-    logger.info("\n-------------------[获取免登url BEGIN]-----------------------------");
+    logger.debug("\n-------------------[获取免登url BEGIN]-----------------------------");
     configAccessControl(ctx);
 
     if (isLogin(ctx) === false) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.info("-------------------[获取免登url 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[获取免登url 用户未登录 END]-----------------------------\n");
         return;
     }
     let originUrl = ctx.query["meetingUrl"] || "";
@@ -243,11 +317,11 @@ async function handleGenerateJumpUrl(ctx) {
         });
 
         var redirectUrl = response.headers.get('location');
-        logger.info("redirectUrl: " + redirectUrl);
+        logger.debug("redirectUrl: " + redirectUrl);
         if (redirectUrl.includes('sso_auth_code')) {
             const urlParams = new URLSearchParams(redirectUrl.split('?')[1]);
             ssoAuthCode = urlParams.get('sso_auth_code');
-            logger.info("sso_auth_code: " + ssoAuthCode);
+            logger.debug("sso_auth_code: " + ssoAuthCode);
             jumpUrl = redirectUrl;
             break;
         }
@@ -263,7 +337,7 @@ async function handleGenerateJumpUrl(ctx) {
         // 处理重定向
         if ([302, 303].includes(response.status)) {
             redirectUrl = response.headers.get('location');
-            logger.info(`Redirecting to: ${redirectUrl}`);
+            logger.debug(`Redirecting to: ${redirectUrl}`);
             initialUrl = redirectUrl;
             continue;
         } else {
@@ -272,8 +346,8 @@ async function handleGenerateJumpUrl(ctx) {
     }
     if (jumpUrl) {
         ctx.body = okResponse(jumpUrl);
-        logger.info("jumpUrl: " + jumpUrl);
-        logger.info("-------------------[获取免登url END]-----------------------------\n");
+        logger.debug("jumpUrl: " + jumpUrl);
+        logger.debug("-------------------[获取免登url END]-----------------------------\n");
     } else {
         ctx.body = failResponse("generate jump url fail");
         logger.error("-------------------[获取免登url END]-----------------------------\n");
@@ -282,12 +356,12 @@ async function handleGenerateJumpUrl(ctx) {
 
 //处理生成scheme免登url请求
 async function handleGenerateJoinUrl(ctx) {
-    logger.info("\n-------------------[获取免登入会url BEGIN]-----------------------------");
+    logger.debug("\n-------------------[获取免登入会url BEGIN]-----------------------------");
     configAccessControl(ctx);
 
     if (isLogin(ctx) === false) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.info("-------------------[获取免登入会url 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[获取免登入会url 用户未登录 END]-----------------------------\n");
         return;
     }
     let originUrl = ctx.query["meetingUrl"] || "";
@@ -299,8 +373,8 @@ async function handleGenerateJoinUrl(ctx) {
     const userid = getUserid(ctx);
     const joinUrl = await generateJoinUrl(originUrl, userid);
     ctx.body = okResponse(joinUrl);
-    logger.info("joinUrl: " + joinUrl);
-    logger.info("-------------------[获取免登url END]-----------------------------\n");
+    logger.debug("joinUrl: " + joinUrl);
+    logger.debug("-------------------[获取免登url END]-----------------------------\n");
     return;
 }
 

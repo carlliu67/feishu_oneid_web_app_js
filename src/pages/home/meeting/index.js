@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, Button, Table, Space } from 'antd';
 import './index.css';
 import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList, handleGenerateJoinScheme } from '../../../components/wemeetapi/wemeetApi.js';
@@ -45,10 +45,8 @@ function MeetingList(props) {
   const [endedMeetings, setEndedMeetings] = useState([]);
   const [endedMeetingsTimestamp, setEndedMeetingsTimeStamp] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const formRef = useRef(null);
   let userInfo = props.userInfo;
   console.log('userInfo:', userInfo);
   if (!userInfo) {
@@ -65,15 +63,20 @@ function MeetingList(props) {
     // 待参加会议和进行中会议使用的是通一个腾讯会议api接口
     if (activeTab === 'upcoming') {
       // 处理即将召开的会议逻辑
-      if (currentTimestamp - MeetingListTimestamp > 30) {
+      // 当MeetingListTimestamp为0（强制刷新）或缓存过期时，重新获取数据
+      // 确保即使之前列表为空，也会重新获取数据
+      if (MeetingListTimestamp === 0 || currentTimestamp - MeetingListTimestamp > 30) {
         meetingListsResult = await handleQueryUserMeetingList();
         console.log('meetingListsResult:', meetingListsResult);
+        // 即使返回空结果也要更新状态和时间戳
         if (!meetingListsResult || meetingListsResult.meeting_number === 0) {
           setMeetings(upcomingMeetingList);
+          setUpcomingMeetings(upcomingMeetingList);
+          setMeetingListTimestamp(currentTimestamp); // 更新时间戳避免重复请求
           setLoading(false);
           return;
         }
-        for (var meetingInfo of meetingListsResult.meeting_info_list) {
+        for (let meetingInfo of meetingListsResult.meeting_info_list) {
           let formattedStartTime = formatTimestamp(meetingInfo.start_time);
           if (meetingInfo.status === 'MEETING_STATE_STARTED') {
             ongoingMeetingList.push({
@@ -102,15 +105,17 @@ function MeetingList(props) {
       }
     } else if (activeTab === 'ongoing') {
       // 处理正在进行的会议逻辑
-      if (currentTimestamp - MeetingListTimestamp > 30) {
+      if (MeetingListTimestamp === 0 || currentTimestamp - MeetingListTimestamp > 30) {
         meetingListsResult = await handleQueryUserMeetingList();
         console.log('meetingListsResult:', meetingListsResult);
         if (!meetingListsResult || meetingListsResult.meeting_number === 0) {
           setMeetings(ongoingMeetingList);
+          setOngoingMeetings(ongoingMeetingList);
+          setMeetingListTimestamp(currentTimestamp);
           setLoading(false);
           return;
         }
-        for (var meetingInfo of meetingListsResult.meeting_info_list) {
+        for (let meetingInfo of meetingListsResult.meeting_info_list) {
           let formattedStartTime = formatTimestamp(meetingInfo.start_time);
           if (meetingInfo.status === 'MEETING_STATE_STARTED') {
             ongoingMeetingList.push({
@@ -139,18 +144,17 @@ function MeetingList(props) {
       }
     } else if (activeTab === 'ended') {
       // 处理已结束的会议逻辑
-      if (currentTimestamp - endedMeetingsTimestamp > 30) {
+      if (endedMeetingsTimestamp === 0 || currentTimestamp - endedMeetingsTimestamp > 30) {
         meetingListsResult = await handleQueryUserEndedMeetingList();
         if (!meetingListsResult || meetingListsResult.total_count === 0) {
           setMeetings(endedMeetingList);
+          setEndedMeetings(endedMeetingList);
+          setEndedMeetingsTimeStamp(currentTimestamp);
           setLoading(false);
           return;
         }
         console.log('endedMeetingListsResult:', meetingListsResult);
-        var totalCount = meetingListsResult.total_count || 0;
-        var totalPage = meetingListsResult.total_page || 0;
-        var currentPage = meetingListsResult.current_page || 0;
-        for (var meetingInfo of meetingListsResult.meeting_info_list) {
+        for (let meetingInfo of meetingListsResult.meeting_info_list) {
           let formattedStartTime = formatTimestamp(meetingInfo.start_time);
           endedMeetingList.push({
             formatted_start_time: formattedStartTime,
@@ -168,50 +172,12 @@ function MeetingList(props) {
       };
     }
     setLoading(false);
-  }, [activeTab, searchText, ongoingMeetings, upcomingMeetings, endedMeetings, userInfo.userid]);
+  }, [activeTab, ongoingMeetings, upcomingMeetings, endedMeetings, MeetingListTimestamp, endedMeetingsTimestamp]);
 
-  const handleSearch = searchText => {
-    setSearchText(searchText);
-  };
-
-  const handleSearchChange = searchText => {
-    handleSearch(searchText);
-  };
-
-  const handleSearchClear = () => {
-    handleSearch('');
-  };
-
-  const handleSearchSubmit = () => {
-    getMeetingInfoList();
-  };
-
-  const handleSearchReset = () => {
-    handleSearchClear();
-    handleSearchSubmit();
-  };
-
-  const handleSearchEnter = e => {
-    if (e.key === 'Enter') {
-      handleSearchSubmit();
-    }
-  };
-
-  const handleSearchIconClick = () => {
-    handleSearchSubmit();
-  };
-
-  const handleSearchDropdownVisibleChange = visible => {
-    if (visible) {
-      setTimeout(() => {
-        formRef.current.setFieldsValue({ searchText: '' });
-      }, 100);
-    }
-  };
 
   useEffect(() => {
     getMeetingInfoList();
-  }, [activeTab, searchText, userInfo.userid]);
+  }, [activeTab, userInfo.userid, getMeetingInfoList]);
 
   const columns = [
     {
@@ -262,12 +228,26 @@ function MeetingList(props) {
 
   const handleCreateMeetingSubmit = async (meetingParamsStr) => {
     try {
+      // 创建会议
       await handleCreateMeeting(meetingParamsStr);
+      // 关闭模态框
       setIsModalVisible(false);
+      // 确保显示即将召开的会议列表
       setActiveTab('upcoming');
-      await getMeetingInfoList();
+      
+      // 增加短暂延时，确保服务器已处理完会议创建
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // 重置MeetingListTimestamp为0，触发useEffect重新执行getMeetingInfoList，获取最新的会议列表
+      setMeetingListTimestamp(0);
     } catch (error) {
       console.error('创建会议失败-----:', error);
+      // 即使出错也要尝试刷新列表
+      try {
+        setMeetingListTimestamp(0);
+      } catch (refreshError) {
+        console.error('刷新会议列表失败:', refreshError);
+      }
     }
   };
 

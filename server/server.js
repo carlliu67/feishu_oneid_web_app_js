@@ -1,20 +1,17 @@
 import Koa from 'koa';
 import Router from 'koa-router';
 import session from 'koa-session';
-import serverConfig from './server_config.js';
+import serverConfig from './config/server_config.js';
 import bodyParser from 'koa-bodyparser';
 import { logger } from './util/logger.js';
 import { handleVerification, handleEvent } from './wemeet/webhook.js';
 import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList } from './wemeet/wemeetApi.js';
 import { handleGenerateJoinScheme, handleGenerateJumpUrl, handleGenerateJoinUrl } from './wemeet/wemeetUtil.js';
 import { getUserAccessToken, getSignParameters } from './feishuapi/feishuAuth.js';
-import { openUserinfoDatabase , openIdTokenDatabase, openTodoDatabase, openCalendarDatabase } from './db/sqlite.js';
+import dbAdapter from './db/db_adapter.js';
 
 // 初始化数据库
-openUserinfoDatabase();
-openIdTokenDatabase();
-openTodoDatabase();
-openCalendarDatabase();
+dbAdapter.initDatabase();
 
 // Start Server
 const app = new Koa()
@@ -35,19 +32,23 @@ app.use(session(koaSessionConfig, app));
 // 使用 koa-bodyparser 中间件
 app.use(bodyParser());
 
-// 注册服务端路由和处理
-router.get(serverConfig.getUserAccessTokenPath, getUserAccessToken)
-router.get(serverConfig.getSignParametersPath, getSignParameters)
-router.post(serverConfig.createMeetingPath, handleCreateMeeting)
-router.get(serverConfig.queryUserEndedMeetingListPath, handleQueryUserEndedMeetingList)
-router.get(serverConfig.queryUserMeetingListPath, handleQueryUserMeetingList)
-router.get(serverConfig.generateJoinSchemePath, handleGenerateJoinScheme)
-router.get(serverConfig.generateJumpUrlPath, handleGenerateJumpUrl)
-router.get(serverConfig.generateJoinUrlPath, handleGenerateJoinUrl)
+if (serverConfig.appServerMode) {
+    // 注册服务端路由和处理
+    router.get(serverConfig.getUserAccessTokenPath, getUserAccessToken)
+    router.get(serverConfig.getSignParametersPath, getSignParameters)
+    router.post(serverConfig.createMeetingPath, handleCreateMeeting)
+    router.get(serverConfig.queryUserEndedMeetingListPath, handleQueryUserEndedMeetingList)
+    router.get(serverConfig.queryUserMeetingListPath, handleQueryUserMeetingList)
+    router.get(serverConfig.generateJoinSchemePath, handleGenerateJoinScheme)
+    router.get(serverConfig.generateJumpUrlPath, handleGenerateJumpUrl)
+    router.get(serverConfig.generateJoinUrlPath, handleGenerateJoinUrl)
+}
 
-// webhook相关路由和处理
-router.get(serverConfig.webhookPath, handleVerification);
-router.post(serverConfig.webhookPath, handleEvent);
+if (serverConfig.webhookServerMode) {
+    // webhook相关路由和处理
+    router.get(serverConfig.webhookPath, handleVerification);
+    router.post(serverConfig.webhookPath, handleEvent);
+}
 
 // 注册路由
 const port = process.env.PORT || serverConfig.apiPort;
