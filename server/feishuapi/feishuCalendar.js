@@ -4,6 +4,10 @@ import axios from 'axios';
 import { logger } from '../util/logger.js';
 import { genH5AppLinkMeetingCode } from './feishuUtil.js';
 import { client } from './feishuClient.js';
+import dbAdapter from '../db/db_adapter.js';
+
+// 从适配器获取数据库方法
+const { dbInsertCalendar, dbDeleteCalendarByMeetingid, dbGetCalendarByMeetingid } = dbAdapter;
 
 // 获取 tenant_access_token
 async function getTenantAccessToken() {
@@ -88,46 +92,7 @@ async function createCalendar(tenant_access_token, calendar_id, meetingInfo) {
 }
 
 // 增加日程参与人
-async function addCalendarAttendees(tenant_access_token, calendar_id, event_id, attendees) {
-    // var currentHosts = meetingInfo.current_hosts? meetingInfo.current_hosts : [];
-    // var hosts = meetingInfo.hosts? meetingInfo.hosts : [];
-    // var participants = meetingInfo.participants? meetingInfo.participants : [];
-    // var attendees = [];
-    // if (currentHosts.length > 0) {
-    //     for (const host of currentHosts) {
-    //         attendees.push({
-    //             type: 'user',
-    //             is_optional: true,
-    //             user_id: host.userid,
-    //             approval_reason: '创建会议时自动添加',
-    //         });
-    //     }
-    // }
-    // if (hosts.length > 0) {
-    //     for (const host of hosts) {
-    //         attendees.push({
-    //             type: 'user',
-    //             is_optional: true,
-    //             user_id: host.userid,
-    //             approval_reason: '创建会议时自动添加',
-    //         });
-    //     }
-    // }
-    // if (participants.length > 0) {
-    //     for (const paticipant of participants) {
-    //         attendees.push({
-    //             type: 'user',
-    //             is_optional: true,
-    //             user_id: paticipant.userid,
-    //             approval_reason: '创建会议时自动添加',
-    //         });
-    //     }
-    // }
-    // logger.info("currentHosts: ", currentHosts);
-    // logger.info("hosts: ", hosts);
-    // logger.info("paticipants: ", participants);
-    // logger.info("attendees: ", attendees);
-    
+async function addCalendarAttendees(tenant_access_token, calendar_id, event_id, attendees) {    
     try {
         const res = await client.calendar.v4.calendarEventAttendee.create({
             path: {
@@ -177,6 +142,7 @@ async function createMeetingCalendar(creatorUserId, meetingInfo, attendees) {
     const event_id = await createCalendar(tenant_access_token, calendarId, meetingInfo);
     const status = await addCalendarAttendees(tenant_access_token, calendarId, event_id, convertToParticipants(attendees));
     if (status === 0) {
+        await dbInsertCalendar(meetingInfo.meeting_id, calendarId, event_id, creatorUserId, meetingInfo.start_time);
         logger.debug("添加日程参与人成功");
     }
 }

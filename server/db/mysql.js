@@ -75,8 +75,9 @@ async function createTables() {
     await connection.query(`
       CREATE TABLE IF NOT EXISTS calendar (
         meetingid VARCHAR(255) PRIMARY KEY,
-        scheduleId VARCHAR(255) NOT NULL,
-        unionid VARCHAR(255) NOT NULL,
+        calendarId VARCHAR(255) NOT NULL,
+        event_id VARCHAR(255) NOT NULL,
+        userid VARCHAR(255) NOT NULL,
         createtimestamp BIGINT NOT NULL
       )
     `);
@@ -325,17 +326,17 @@ async function dbDeleteTodoByMeetingid(meetingid) {
 // calendar相关操作方法
 
 // 插入calendar数据
-async function dbInsertCalendar(meetingid, scheduleId, unionid, createtimestamp) {
+async function dbInsertCalendar(meetingid, calendarId, event_id, userid, createtimestamp) {
   const connection = await getConnection();
   try {
     // 确保createtimestamp是数字类型
     const timestamp = typeof createtimestamp === 'number' ? createtimestamp : parseInt(createtimestamp);
     
     const [result] = await connection.execute(
-      'INSERT INTO calendar (meetingid, scheduleId, unionid, createtimestamp) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE scheduleId = VALUES(scheduleId), unionid = VALUES(unionid), createtimestamp = VALUES(createtimestamp)',
-      [meetingid, scheduleId, unionid, timestamp]
+      'INSERT INTO calendar (meetingid, calendarId, event_id, userid, createtimestamp) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE calendarId = VALUES(calendarId), event_id = VALUES(event_id), userid = VALUES(userid), createtimestamp = VALUES(createtimestamp)',
+      [meetingid, calendarId, event_id, userid, timestamp]
     );
-    logger.debug(`dbInsertCalendar scheduleId: ${scheduleId}, unionid: ${unionid}, meetingid: ${meetingid}, createtimestamp: ${timestamp} inserted successfully`);
+    logger.debug(`dbInsertCalendar calendarId: ${calendarId}, event_id: ${event_id}, userid: ${userid}, meetingid: ${meetingid}, createtimestamp: ${timestamp} inserted successfully`);
     return 'dbInsertCalendar inserted successfully';
   } catch (err) {
     logger.error('dbInsertCalendar failed:', err.message);
