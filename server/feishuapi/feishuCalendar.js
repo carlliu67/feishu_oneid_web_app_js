@@ -151,6 +151,22 @@ async function addCalendarAttendees(tenant_access_token, calendar_id, event_id, 
     }
 }
 
+/**
+ * 将用户ID数组转换为飞书日历事件参与者格式
+ * @param {string[]} userIds - 用户ID数组
+ * @returns {Array<{type: string, user_id: string}>} - 转换后的参与者数组
+ */
+function convertToParticipants(userIds) {
+  if (!Array.isArray(userIds)) {
+    throw new Error('入参必须是数组');
+  }
+  
+  return userIds.map(userId => ({
+    type: "user",
+    user_id: userId
+  }));
+}
+
 // 创建会议日程
 async function createMeetingCalendar(creatorUserId, meetingInfo, attendees) {
     const tenant_access_token = await getTenantAccessToken();
@@ -159,7 +175,7 @@ async function createMeetingCalendar(creatorUserId, meetingInfo, attendees) {
     const calendarId = getPrimaryCalendarId(Array.from(calendar_list));
     logger.debug("calendarId: ", calendarId);
     const event_id = await createCalendar(tenant_access_token, calendarId, meetingInfo);
-    const status = await addCalendarAttendees(tenant_access_token, calendarId, event_id, attendees);
+    const status = await addCalendarAttendees(tenant_access_token, calendarId, event_id, convertToParticipants(attendees));
     if (status === 0) {
         logger.debug("添加日程参与人成功");
     }
