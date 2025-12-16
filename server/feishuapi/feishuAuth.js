@@ -169,12 +169,12 @@ async function getSignParameters(ctx) {
 //计算鉴权参数
 function calculateSignParam(tickeString, url) {
     const timestamp = (new Date()).getTime()
-    const verifyStr = `jsapi_ticket=${tickeString}&noncestr=${serverConfig.noncestr}&timestamp=${timestamp}&url=${url}`
+    const verifyStr = `jsapi_ticket=${tickeString}&noncestr=${serverConfig.wemeetAPPID}&timestamp=${timestamp}&url=${url}`
     let signature = CryptoJS.SHA1(verifyStr).toString(CryptoJS.enc.Hex)
     const signParam = {
         "app_id": serverConfig.feishuAppId,
         "signature": signature,
-        "noncestr": serverConfig.noncestr,
+        "noncestr": serverConfig.wemeetAPPID,
         "timestamp": timestamp,
     }
     return signParam

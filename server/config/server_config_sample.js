@@ -2,8 +2,9 @@ const config = {
     feishuAppId: "", //网页应用appId
     feishuAppSecret: "", //网页应用secret
     feishuAppName: "腾讯会议", //网页应用名称
-    calendarSwitch: false, //预约普通会议是是否创建钉钉日程，对周期会议不生效，周期会议固定会创建日程
-    taskSwitch: true, //预约普通会议是是否创建钉钉待办，对周期会议不生效，周期会议固定会创建日程
+    feishuHomeUrl: "http://feishu-test.company.cn:9000", //网页应用首页地址
+    calendarSwitch: true, //预约普通会议是是否创建钉钉日程，对周期会议不生效，周期会议固定会创建日程
+    // taskSwitch: true, //预约普通会议是是否创建钉钉待办，对周期会议不生效，周期会议固定会创建日程。暂未支持
 
     // server运行参数配置
     apiPort: "9001",   //后端指定端口
