@@ -103,10 +103,9 @@ function handleApiError(error, apiName) {
  */
 async function queryMeetingById(meetingId, userid) {
     const uri = `/v1/meetings/${meetingId}?userid=${userid}&instanceid=1`;
+    const requestConfig = createRequestConfig('GET', uri);
     
-    let requestConfig = null;
     try {
-        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询会议请求配置: ", requestConfig);
 
         const response = await axios(requestConfig);
@@ -128,10 +127,9 @@ async function queryMeetingRecordList(webhookMeetingInfo) {
     const startTime = webhookMeetingInfo.start_time - 24 * 60 * 60;
     const timestamp = Math.floor(Date.now() / 1000);
     const uri = `/v1/records?meeting_id=${webhookMeetingInfo.meeting_id}&start_time=${startTime}&end_time=${timestamp}&operator_id=${webhookMeetingInfo.creator.userid}&operator_id_type=1`;
+    const requestConfig = createRequestConfig('GET', uri);
 
-    let requestConfig = null;
     try {
-        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询会议录制列表请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -153,10 +151,9 @@ async function queryMeetingRecordList(webhookMeetingInfo) {
  */
 async function queryMeetingRecordAddress(meeting_record_id, userid) {
     const uri = `/v1/addresses?meeting_record_id=${meeting_record_id}&userid=${userid}`;
+    const requestConfig = createRequestConfig('GET', uri);
 
-    let requestConfig = null;
     try {
-        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询会议录制地址请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -177,10 +174,9 @@ async function queryMeetingRecordAddress(meeting_record_id, userid) {
  */
 async function queryMeetingParticipants(meeting_id, userid) {
     const uri = `/v1/meetings/${meeting_id}/participants?userid=${userid}&size=100`;
+    const requestConfig = createRequestConfig('GET', uri);
 
-    let requestConfig = null;
     try {
-        requestConfig = createRequestConfig('GET', uri);
         logger.debug("获取参会成员明细请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -214,22 +210,19 @@ async function handleCreateMeeting(ctx) {
         const uri = "/v1/meetings";
         meetingParams = JSON.parse(ctx.request.body.data);
         meetingParams.userid = getUserid(ctx);
-        
-        logger.debug("发起创建会议请求，参数: ", meetingParams);
-        
         requestConfig = createRequestConfig('POST', uri, meetingParams);
-        logger.debug("创建会议请求配置: ", requestConfig);
+        // 创建会议日志记录下来
+        logger.info("创建会议请求参数: ", requestConfig);
         
         const response = await axios(requestConfig);
         ctx.body = okResponse(response.data);
     } catch (error) {
-        logger.warn("创建会议请求配置: ", requestConfig);
-        logger.warn("发起创建会议请求，参数: ", meetingParams);
+        logger.warn("创建会议请求参数: ", requestConfig);
         if (error instanceof SyntaxError) {
             logger.error("解析请求body数据时出错: ", error);
             ctx.body = failResponse("请求数据格式错误");
         } else {
-            logger.error("请求会议接口时出错: ", error);
+            logger.error("请求会议接口时出错: ", error.response?.data || { message: '内部服务器错误' });
             ctx.status = error.response?.status || 500;
             ctx.body = failResponse(error.response?.data || { message: '内部服务器错误' });
         }
@@ -265,10 +258,9 @@ async function handleQueryUserEndedMeetingList(ctx) {
     }
 
     const uri = `/v1/history/meetings/${getUserid(ctx)}?page_size=${page_size}&page=${page}`;
+    const requestConfig = createRequestConfig('GET', uri);
 
-    let requestConfig = null;
     try {
-        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询用户已结束会议列表请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);
@@ -310,10 +302,9 @@ async function handleQueryUserMeetingList(ctx) {
     }
 
     const uri = `/v1/meetings?userid=${getUserid(ctx)}&instanceid=1`;
+    const requestConfig = createRequestConfig('GET', uri);
 
-    let requestConfig = null;
     try {
-        requestConfig = createRequestConfig('GET', uri);
         logger.debug("查询用户会议列表请求配置: ", requestConfig);
         
         const response = await axios(requestConfig);

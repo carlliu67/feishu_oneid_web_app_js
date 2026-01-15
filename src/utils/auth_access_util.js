@@ -164,9 +164,15 @@ function requestUserAccessToken(code, complete) {
 export function getOrigin(apiPort) {
     // console.log('process.env', process.env)
     if (clientConfig.serverUrl && clientConfig.serverUrl.length > 0) {
-        return clientConfig.serverUrl + ":" + apiPort
+        return clientConfig.serverProtocol + `://${clientConfig.serverUrl}:${apiPort}`
     } else {
         let hostname = window.location.hostname
         return clientConfig.serverProtocol + `://${hostname}:${apiPort}`
     }
+}
+
+// 移动端检测函数
+export function isMobileDevice() {
+  const userAgent = navigator.userAgent || window.opera;
+  return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
 }

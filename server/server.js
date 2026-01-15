@@ -9,6 +9,7 @@ import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMe
 import { handleGenerateJoinScheme, handleGenerateJumpUrl, handleGenerateJoinUrl } from './wemeet/wemeetUtil.js';
 import { getUserAccessToken, getSignParameters } from './feishuapi/feishuAuth.js';
 import dbAdapter from './db/db_adapter.js';
+import { handleFrontendLogs } from './util/logHandler.js';
 
 // 初始化数据库
 dbAdapter.initDatabase();
@@ -33,6 +34,12 @@ app.use(session(koaSessionConfig, app));
 app.use(bodyParser());
 
 if (serverConfig.appServerMode) {
+    // 处理OPTIONS预检请求
+    router.options('/api/:path*', (ctx) => {
+        ctx.status = 204;
+        // 不设置任何CORS头，让Nginx处理
+    });
+    
     // 注册服务端路由和处理
     router.get(serverConfig.getUserAccessTokenPath, getUserAccessToken)
     router.get(serverConfig.getSignParametersPath, getSignParameters)
@@ -42,6 +49,9 @@ if (serverConfig.appServerMode) {
     router.get(serverConfig.generateJoinSchemePath, handleGenerateJoinScheme)
     router.get(serverConfig.generateJumpUrlPath, handleGenerateJumpUrl)
     router.get(serverConfig.generateJoinUrlPath, handleGenerateJoinUrl)
+    
+    // 前端日志接收接口
+    router.post('/api/logs', handleFrontendLogs)
 }
 
 if (serverConfig.webhookServerMode) {
@@ -49,6 +59,11 @@ if (serverConfig.webhookServerMode) {
     router.get(serverConfig.webhookPath, handleVerification);
     router.post(serverConfig.webhookPath, handleEvent);
 }
+
+// 保持alive路由
+router.get(serverConfig.keepAlivePath, (ctx) => {
+        ctx.body = serverConfig.keepAliveResponse;
+    })
 
 // 注册路由
 const port = process.env.PORT || serverConfig.apiPort;
@@ -58,4 +73,61 @@ app.listen(port, () => {
     logger.info(`server is start, listening on port ${port}`);
 }).on('error', (err) => {
     logger.error(`Failed to start server on port ${port}:`, err);
+});
+
+// 安全地记录错误到stderr
+function safeErrorLog(message, error) {
+    try {
+        const errMsg = error instanceof Error ? `${error.message}\n${error.stack}` : String(error);
+        process.stderr.write(`${message}: ${errMsg}\n`);
+    } catch (stderrErr) {
+        // 如果stderr也不可用，静默失败
+    }
+}
+
+// 处理未捕获的异常
+process.on('uncaughtException', (err) => {
+    try {
+        logger.error('捕获到未处理的异常:', err);
+    } catch (logErr) {
+        // 如果日志记录失败，使用安全的方式记录到stderr
+        safeErrorLog('捕获到未处理的异常', err);
+        safeErrorLog('日志记录失败', logErr);
+    }
+    // 可以添加其他清理操作
+});
+
+// 处理未处理的 Promise 拒绝
+process.on('unhandledRejection', (reason, promise) => {
+    try {
+        logger.error('捕获到未处理的 Promise 拒绝:', reason);
+    } catch (logErr) {
+        // 如果日志记录失败，使用安全的方式记录到stderr
+        safeErrorLog('捕获到未处理的 Promise 拒绝', reason);
+        safeErrorLog('日志记录失败', logErr);
+    }
+    // 可以添加其他清理操作
+});
+
+// 处理进程终止信号
+process.on('SIGTERM', () => {
+    try {
+        logger.info('收到 SIGTERM 信号，正在关闭服务器...');
+    } catch (logErr) {
+        console.error('收到 SIGTERM 信号，正在关闭服务器...');
+        console.error('日志记录失败:', logErr);
+    }
+    // 可以添加优雅关闭的逻辑
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    try {
+        logger.info('收到 SIGINT 信号，正在关闭服务器...');
+    } catch (logErr) {
+        console.error('收到 SIGINT 信号，正在关闭服务器...');
+        console.error('日志记录失败:', logErr);
+    }
+    // 可以添加优雅关闭的逻辑
+    process.exit(0);
 });

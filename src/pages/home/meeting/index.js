@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Tabs, Button, Table, Space } from 'antd';
+import { Tabs, Button, Table, Space, Modal } from 'antd';
 import './index.css';
-import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList, handleGenerateJoinScheme } from '../../../components/wemeetapi/wemeetApi.js';
+import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList, handleGenerateJoinScheme, handleGenerateJoinUrl } from '../../../components/wemeetapi/wemeetApi.js';
+import { isMobileDevice } from '../../../utils/auth_access_util.js';
 import MeetingModal from './MeetingModal.js';
 import clientConfig from '../../../config/client_config.js';
+import { frontendLogger } from '../../../utils/logger.js';
+
+// 定义错误码常量
+const ERROR_CODE_LOGIN_REQUIRED = 500214; // 首次使用需要登录腾讯会议客户端的错误码
 
 function formatTimestamp(timestamp) {
   // 将秒级时间戳转换为毫秒级时间戳
@@ -48,7 +53,7 @@ function MeetingList(props) {
   const [activeTab, setActiveTab] = useState('upcoming');
   const [isModalVisible, setIsModalVisible] = useState(false);
   let userInfo = props.userInfo;
-  console.log('userInfo:', userInfo);
+  frontendLogger.info('用户信息', { userInfo });
   if (!userInfo) {
     userInfo = {};
   }
@@ -67,7 +72,7 @@ function MeetingList(props) {
       // 确保即使之前列表为空，也会重新获取数据
       if (MeetingListTimestamp === 0 || currentTimestamp - MeetingListTimestamp > 30) {
         meetingListsResult = await handleQueryUserMeetingList();
-        console.log('meetingListsResult:', meetingListsResult);
+        frontendLogger.info('会议列表结果', { meetingListsResult });
         // 即使返回空结果也要更新状态和时间戳
         if (!meetingListsResult || meetingListsResult.meeting_number === 0) {
           setMeetings(upcomingMeetingList);
@@ -85,6 +90,7 @@ function MeetingList(props) {
               meeting_code: meetingInfo.meeting_code,
               start_time: meetingInfo.start_time,
               meeting_id: meetingInfo.meeting_id,
+              join_url: meetingInfo.join_url,
             });
           } else {
             upcomingMeetingList.push({
@@ -93,6 +99,7 @@ function MeetingList(props) {
               meeting_code: meetingInfo.meeting_code,
               start_time: meetingInfo.start_time,
               meeting_id: meetingInfo.meeting_id,
+              join_url: meetingInfo.join_url,
             });
           }
         }
@@ -107,7 +114,7 @@ function MeetingList(props) {
       // 处理正在进行的会议逻辑
       if (MeetingListTimestamp === 0 || currentTimestamp - MeetingListTimestamp > 30) {
         meetingListsResult = await handleQueryUserMeetingList();
-        console.log('meetingListsResult:', meetingListsResult);
+        frontendLogger.info('会议列表结果', { meetingListsResult });
         if (!meetingListsResult || meetingListsResult.meeting_number === 0) {
           setMeetings(ongoingMeetingList);
           setOngoingMeetings(ongoingMeetingList);
@@ -124,6 +131,7 @@ function MeetingList(props) {
               meeting_code: meetingInfo.meeting_code,
               start_time: meetingInfo.start_time,
               meeting_id: meetingInfo.meeting_id,
+              join_url: meetingInfo.join_url,
             });
           } else {
             upcomingMeetingList.push({
@@ -132,6 +140,7 @@ function MeetingList(props) {
               meeting_code: meetingInfo.meeting_code,
               start_time: meetingInfo.start_time,
               meeting_id: meetingInfo.meeting_id,
+              join_url: meetingInfo.join_url,
             });
           }
         }
@@ -153,7 +162,7 @@ function MeetingList(props) {
           setLoading(false);
           return;
         }
-        console.log('endedMeetingListsResult:', meetingListsResult);
+        frontendLogger.info('已结束会议列表结果', { meetingListsResult });
         for (let meetingInfo of meetingListsResult.meeting_info_list) {
           let formattedStartTime = formatTimestamp(meetingInfo.start_time);
           endedMeetingList.push({
@@ -162,6 +171,7 @@ function MeetingList(props) {
             meeting_code: meetingInfo.meeting_code,
             start_time: meetingInfo.start_time,
             meeting_id: meetingInfo.meeting_id,
+            join_url: meetingInfo.join_url,
           });
         }
         setEndedMeetings(endedMeetingList);
@@ -176,8 +186,11 @@ function MeetingList(props) {
 
 
   useEffect(() => {
-    getMeetingInfoList();
-  }, [activeTab, userInfo.userid, getMeetingInfoList]);
+    // 只有当用户信息存在且包含有效用户ID时才获取会议列表
+    if (userInfo && userInfo.user_id) {
+      getMeetingInfoList();
+    }
+  }, [activeTab, userInfo.user_id, getMeetingInfoList]);
 
   const columns = [
     {
@@ -196,26 +209,92 @@ function MeetingList(props) {
       dataIndex: 'meeting_code',
       width: 150
     },
-    { title: '操作', width: 350, render: (_, record) => { const buttons = []; if (activeTab === 'ongoing') { buttons.unshift(<Button key="join" onClick={() => handleJoinMeeting(record.meeting_code)} style={{ width: 'auto' }}>加入会议</Button>); } else if (activeTab === 'ended') { buttons.unshift(<Button key="delete" danger onClick={() => handleDelete(record.meeting_id)} style={{ width: 'auto' }}>删除</Button>); buttons.unshift(<Button key="export-members" onClick={() => handleExportMembers(record.meeting_id)} style={{ width: 'auto' }}>导出参会成员</Button>); buttons.unshift(<Button key="export-checkin" onClick={() => handleExportCheckin(record.meeting_id)} style={{ width: 'auto' }}>导出签到记录</Button>); } else if (activeTab === 'upcoming') { buttons.unshift(<Button key="join" onClick={() => handleJoinMeeting(record.meeting_code)} style={{ width: 'auto' }}>加入会议</Button>); } return <Space>{buttons}</Space>; } }
+    { 
+      title: '操作', 
+      width: 180, 
+      render: (_, record) => { 
+        const buttons = []; 
+        if (activeTab === 'ongoing') { 
+          buttons.unshift( 
+            <Button 
+              key="join" 
+              onClick={() => handleJoinMeeting(record.meeting_code, record.join_url)} 
+              style={{ width: 'auto' }} 
+            >
+              加入会议
+            </Button>
+          ); 
+        } else if (activeTab === 'ended') { 
+          buttons.unshift( 
+            <Button 
+              key="delete" 
+              danger 
+              onClick={() => handleDelete(record.meeting_id)} 
+              style={{ width: 'auto' }} 
+            >
+              删除
+            </Button>
+          ); 
+          buttons.unshift( 
+            <Button 
+              key="export-members" 
+              onClick={() => handleExportMembers(record.meeting_id)} 
+              style={{ width: 'auto' }} 
+            >
+              导出参会成员
+            </Button>
+          ); 
+          buttons.unshift( 
+            <Button 
+              key="export-checkin" 
+              onClick={() => handleExportCheckin(record.meeting_id)} 
+              style={{ width: 'auto' }} 
+            >
+              导出签到记录
+            </Button>
+          ); 
+        } else if (activeTab === 'upcoming') { 
+          buttons.unshift( 
+            <Button 
+              key="join" 
+              onClick={() => handleJoinMeeting(record.meeting_code, record.join_url)} 
+              style={{ width: 'auto' }} 
+            >
+              加入会议
+            </Button>
+          ); 
+        } 
+        return <Space>{buttons}</Space>; 
+      } 
+    }
   ];
 
-  // 新增加入会议的处理函数
-  const handleJoinMeeting = meeting_code => {
-    console.log('Join meeting:', meeting_code);
+  // 加入会议的处理函数
+  const handleJoinMeeting = (meeting_code, join_url) => {
+    frontendLogger.info('加入会议', { meeting_code, join_url });
+    // 飞书pc端和移动端都支持scheme协议，所以这里直接调用handleGenerateJoinScheme
     handleGenerateJoinScheme(meeting_code, false);
+    // // 根据设备类型调用不同的加入会议函数
+    // if (isMobileDevice()) {
+    //   // 移动端调用handleGenerateJoinUrl
+    //   handleGenerateJoinUrl(join_url, false);
+    // } else {
+    //   // PC端调用handleGenerateJoinScheme
+    //   handleGenerateJoinScheme(meeting_code, false);
+    // }
   };
 
 
   const handleDelete = id => {
-    console.log('Delete:', id);
+    frontendLogger.info('删除会议', { id });
   };
 
   const handleExportMembers = id => {
-    console.log('Export members:', id);
+    frontendLogger.info('导出参会成员', { id });
   };
 
   const handleExportCheckin = id => {
-    console.log('Export checkin:', id);
+    frontendLogger.info('导出签到记录', { id });
   };
 
   const showModal = () => {
@@ -229,24 +308,60 @@ function MeetingList(props) {
   const handleCreateMeetingSubmit = async (meetingParamsStr) => {
     try {
       // 创建会议
-      await handleCreateMeeting(meetingParamsStr);
-      // 关闭模态框
-      setIsModalVisible(false);
-      // 确保显示即将召开的会议列表
-      setActiveTab('upcoming');
-      
-      // 增加短暂延时，确保服务器已处理完会议创建
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // 重置MeetingListTimestamp为0，触发useEffect重新执行getMeetingInfoList，获取最新的会议列表
-      setMeetingListTimestamp(0);
+      const result = await handleCreateMeeting(meetingParamsStr);
+
+      // 检查是否有错误响应
+      if (result && result.new_error_code) {
+        if (result.new_error_code === ERROR_CODE_LOGIN_REQUIRED) {
+          // 显示登录腾讯会议客户端的弹窗
+          Modal.info({
+            title: '首次使用提示',
+            content: (
+              <div>
+                <p>首次使用预约会议功能需要先登录腾讯会议客户端</p>
+              </div>
+            ),
+            okText: '登录腾讯会议客户端',
+            onOk() {
+              // 调用handleGenerateJoinScheme方法
+              // 由于没有具体会议码，这里可以使用一个默认的会议码或者提示用户
+              // 为了演示，我们使用一个示例会议码
+              handleGenerateJoinScheme('', true);
+            },
+            okButtonProps: { style: { width: 'auto' } }
+          });
+        } else {
+          // 处理其他错误
+          Modal.error({
+            title: '会议创建失败',
+            content: (
+              <div>
+                <p>{result.message || '请稍后重试'}</p>
+              </div>
+            ),
+            okText: '确定',
+            okButtonProps: { style: { width: 'auto' } }
+          });
+        }
+      } else {
+        // 关闭模态框
+        setIsModalVisible(false);
+        // 确保显示即将召开的会议列表
+        setActiveTab('upcoming');
+
+        // 增加短暂延时，确保服务器已处理完会议创建
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 重置MeetingListTimestamp为0，触发useEffect重新执行getMeetingInfoList，获取最新的会议列表
+        setMeetingListTimestamp(0);
+      }
     } catch (error) {
-      console.error('创建会议失败-----:', error);
+      frontendLogger.error('创建会议失败', { error });
       // 即使出错也要尝试刷新列表
       try {
         setMeetingListTimestamp(0);
       } catch (refreshError) {
-        console.error('刷新会议列表失败:', refreshError);
+        frontendLogger.error('刷新会议列表失败', { error: refreshError });
       }
     }
   };

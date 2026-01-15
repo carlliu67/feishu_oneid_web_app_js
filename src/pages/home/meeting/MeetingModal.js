@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Modal, Form, Input, DatePicker, TimePicker, InputNumber, Button, message } from 'antd';
+import { Modal, Form, Input, DatePicker, TimePicker, Button, Select, Switch } from 'antd';
 import dayjs from 'dayjs';
 import './MeetingModal.css'
 import clientConfig from '../../../config/client_config.js';
+import { frontendLogger } from '../../../utils/logger.js';
+const { Option } = Select;
 
 const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
   const [selectedHosts, setSelectedHosts] = useState([]); // 存储选中的主持人列表，每项包含 {id, name}
@@ -15,7 +17,35 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     const minutesToAdd = 30 - remainder;
     return now.add(minutesToAdd, 'minute');
   });
+  const [currentEndDate, setCurrentEndDate] = useState(dayjs().startOf('day')); // 使用状态变量存储结束日期
+  const [currentEndTime, setCurrentEndTime] = useState(() => { // 使用状态变量存储结束时间，初始值为开始时间+30分钟
+    const now = dayjs();
+    const currentMinutes = now.minute();
+    const remainder = currentMinutes % 15;
+    const minutesToAdd = 30 - remainder;
+    return now.add(minutesToAdd + 30, 'minute');
+  });
   const formRef = useRef(null);
+  // 监听开始时间变化，联动更新结束时间
+  useEffect(() => {
+    if (formRef.current) {
+      const { start_date, start_time } = formRef.current.getFieldsValue(['start_date', 'start_time']);
+      if (start_date && start_time) {
+        const startDateTime = dayjs(start_date).hour(dayjs(start_time).hour()).minute(dayjs(start_time).minute());
+        const endDateTime = startDateTime.add(30, 'minute');
+        
+        // 更新状态变量
+        setCurrentEndDate(endDateTime.startOf('day'));
+        setCurrentEndTime(endDateTime);
+        
+        // 更新表单值
+        formRef.current.setFieldsValue({
+          end_date: endDateTime.startOf('day'),
+          end_time: endDateTime
+        });
+      }
+    }
+  }, [currentDate, currentTime]);
 
   // 使用useEffect监听visible属性变化，确保每次Modal显示时都更新时间
   useEffect(() => {
@@ -26,24 +56,37 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
       const remainder = currentMinutes % 15;
       const minutesToAdd = 30 - remainder;
       const adjustedTime = now.add(minutesToAdd, 'minute');
+      const adjustedEndTime = adjustedTime.add(30, 'minute');
       
-      console.log('Modal visible, updating time to:', adjustedTime.format('HH:mm'));
+      frontendLogger.info('Modal显示，更新时间', { time: adjustedTime.format('HH:mm') });
       
       // 更新状态变量
       setCurrentDate(now.startOf('day'));
       setCurrentTime(adjustedTime);
+      setCurrentEndDate(now.startOf('day'));
+      setCurrentEndTime(adjustedEndTime);
       
       // 延迟执行以确保formRef已初始化
       setTimeout(() => {
         if (formRef.current) {
-          formRef.current.resetFields(['start_time']);
+          formRef.current.resetFields(['start_time', 'end_time']);
           formRef.current.setFieldsValue({
-            start_time: adjustedTime
+            start_time: adjustedTime,
+            end_time: adjustedEndTime
           });
         }
       }, 0);
     }
   }, [visible]);
+
+  // 监听窗口大小变化，动态调整表单布局
+  useEffect(() => {
+    const handleResize = () => {
+      formRef.current?.setFieldsValue({});
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const showModal = () => {
     // 使用新的变量名避免混淆
@@ -55,20 +98,27 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     const remainder = currentMinutes % 15;
     const minutesToAdd = remainder > 0 ? 15 - remainder : 0;
     const adjustedTime = newNow.add(minutesToAdd, 'minute');
+    const adjustedEndTime = adjustedTime.add(30, 'minute');
     
-    console.log('showModal called, current time:', newNow.format('HH:mm'), 'adjusted to:', adjustedTime.format('HH:mm'));
+    frontendLogger.info('showModal调用', { 
+      currentTime: newNow.format('HH:mm'), 
+      adjustedTime: adjustedTime.format('HH:mm') 
+    });
     
     // 更新状态变量，触发组件重新渲染
     setCurrentDate(newDate);
     setCurrentTime(adjustedTime);
+    setCurrentEndDate(newDate);
+    setCurrentEndTime(adjustedEndTime);
     
     // 强制更新表单值
     if (formRef.current) {
       // 先重置表单，确保清除之前的值
-      formRef.current.resetFields(['start_time']);
+      formRef.current.resetFields(['start_time', 'end_time']);
       // 然后设置新的值
       formRef.current.setFieldsValue({
-        start_time: adjustedTime
+        start_time: adjustedTime,
+        end_time: adjustedEndTime
       });
     }
   };
@@ -117,17 +167,17 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
         enableChooseDepartment: false,
         chosenIds: selectedHosts.map(host => host.id),
         success(res) {
-          console.log('选择人员结果:', res); // 打印返回结果以帮助调试
+          frontendLogger.info('选择人员结果', { result: res });
 
           if (res && Array.isArray(res.users) && res.users.length > 0) {
-            // 确认返回的是一个用户对象数组 [{ name, avatar, emplId }, ...]
-            const hosts = res.users.map((user) => ({
-              id: user.emplId,
-              name: user.name
-            }));
+              // 确认返回的是一个用户对象数组 [{ name, avatar, emplId }, ...]
+              const hosts = res.users.map((user) => ({
+                id: user.emplId,
+                name: user.name
+              }));
 
-            console.log('解析到人员数据:', hosts); // 打印解析后的人员数据
-            setSelectedHosts(hosts); // 设置选中的人员数据
+              frontendLogger.info('解析到人员数据', { hosts });
+              setSelectedHosts(hosts); // 设置选中的人员数据
 
           } else {
             // 如果返回的不是预期的数组结构或数组为空
@@ -153,7 +203,7 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
         enableChooseDepartment: false,
         chosenIds: selectedInvitees.map(invitee => invitee.id),
         success(res) {
-          console.log('选择邀请成员结果:', res); // 打印返回结果以帮助调试
+          frontendLogger.info('选择邀请成员结果', { result: res });
 
           if (res && Array.isArray(res.users) && res.users.length > 0) {
               // 确认返回的是一个用户对象数组 [{ name, avatar, emplId }, ...]
@@ -162,7 +212,7 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
                 name: user.name
               }));
 
-              console.log('解析到邀请成员数据:', invitees); // 打印解析后的人员数据
+              frontendLogger.info('解析到邀请成员数据', { invitees });
               setSelectedInvitees(invitees); // 设置选中的人员数据
 
           } else {
@@ -177,6 +227,16 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     });
   };
 
+
+
+  // 监听日期和时间变化，手动触发相关字段的重新验证
+  useEffect(() => {
+    if (formRef.current) {
+      // 当日期或时间变化时，重新验证所有相关字段
+      formRef.current.validateFields(['start_date', 'start_time', 'end_date', 'end_time']);
+    }
+  }, [currentDate, currentTime, currentEndDate, currentEndTime]);
+
   const handleCreateMeetingSubmit = async (values) => {
     var meetingParams = {};
     meetingParams.instanceid = 1;
@@ -184,13 +244,22 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     meetingParams.hosts = selectedHosts.map(host => host.id); // 从合并后的状态中提取hosts数组
     meetingParams.invitees = selectedInvitees.map(invitee => invitee.id); // 从合并后的状态中提取invitees数组
     meetingParams.type = 0;
+    // 初始化settings对象
+    meetingParams.settings = {};
+    // 参会限制类型
+    meetingParams.settings.only_user_join_type = values.only_user_join_type;
+    // 水印设置 - 优先使用表单值（如果存在），否则使用配置默认值
+    meetingParams.settings.allow_screen_shared_watermark = values.allow_screen_shared_watermark !== undefined ? values.allow_screen_shared_watermark : clientConfig.allow_screen_shared_watermark;
+    meetingParams.settings.water_mark_type = clientConfig.water_mark_type;
+    // 音频水印设置
+    meetingParams.settings.audio_watermark = clientConfig.audio_watermark;
     // console.log("startTime: ", values.start_time);
     const startDateTime = dayjs(values.start_date).hour(dayjs(values.start_time).hour()).minute(dayjs(values.start_time).minute());
     meetingParams.start_time = String(startDateTime.unix());
-    const durationMinutes = values.duration;
-    meetingParams.end_time = String(startDateTime.add(durationMinutes, 'minute').unix());
+    const endDateTime = dayjs(values.end_date).hour(dayjs(values.end_time).hour()).minute(dayjs(values.end_time).minute());
+    meetingParams.end_time = String(endDateTime.unix());
     var meetingParamsStr = JSON.stringify(meetingParams);
-    console.log("meetingParamsStr: ", meetingParamsStr);
+    frontendLogger.info('会议参数字符串', { meetingParamsStr });
     onCreate(meetingParamsStr);
     // 清空组件内部的主持人和邀请人状态数据，确保下一次打开Modal时不会显示之前的数据
     setSelectedHosts([]); // 清空主持人数据
@@ -213,76 +282,289 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
 
   return (
     <Modal
-      title="预约会议"
-      open={visible}
-      footer={null}
-      onCancel={handleCancel}
-      onOpen={showModal}
-    >
+        title="预约会议"
+        open={visible}
+        onCancel={handleCancel}
+        footer={null}
+        onOpen={showModal}
+        // 响应式宽度设置，PC端固定宽度，移动端自适应
+        width={{ xs: '95%', sm: 700, md: 700 }}
+        // 设置最小宽度以确保内容不会太窄
+        style={{ minWidth: '400px' }}
+        styles={{ body: { padding: '16px', maxHeight: '80vh', overflowY: 'auto' } }}
+        // 移除centered属性，让弹窗在移动端默认显示在顶部
+        // 移动端自动调整
+        breakPoint="md"
+      >
       <Form
         name="meetingReservation"
         onFinish={handleCreateMeetingSubmit}
         ref={formRef}
-        labelCol={{ xs: 24, sm: 6, style: { textAlign: 'right' } }}
-        wrapperCol={{ xs: 24, sm: 16, style: { textAlign: 'left' } }}
+        // 响应式表单布局，移动端标签文字靠左显示
+        labelCol={{ xs: 24, sm: 6, style: { textAlign: window.innerWidth <= 768 ? 'left' : 'right', marginBottom: '8px' } }}
+        wrapperCol={{ xs: 24, sm: 16 }}
+        // 移动端垂直布局
+        layout={window.innerWidth <= 768 ? 'vertical' : 'horizontal'}
         initialValues={{
           topic: userInfo.name + "预约的会议",
           start_date: currentDate,
           start_time: currentTime,
-          duration: 60
+          end_date: currentEndDate,
+          end_time: currentEndTime,
+          only_user_join_type: clientConfig.only_user_join_type || 1,
+          allow_screen_shared_watermark: clientConfig.allow_screen_shared_watermark || true
         }}
       >
         <Form.Item
           name="topic"
           label="会议主题"
-          rules={[{ required: true, message: '请输入会议主题' }]}
+          rules={[{ required: true, message: '请输入会议主题!' }]}
+          style={{ marginBottom: 16 }}
         >
-          <Input />
-        </Form.Item>
-        <Form.Item
-          name="start_date"
-          label="开始日期"
-          rules={[{ required: true, message: '请选择开始日期' }]}
-        >
-          <DatePicker format="YYYY/MM/DD" />
-        </Form.Item>
-        <Form.Item
-          name="start_time"
-          label="开始时间"
-          rules={[{ required: true, message: '请选择开始时间' }]}
-        >
-          <TimePicker
-            format="HH:mm"
-            showTime={{
-              disabledTime: disabledTime,
-            }}
-            placeholder="选择时间"
-            showNow={false}
+          <Input 
+            placeholder="请输入会议主题" 
+            style={{ width: '100%' }}
+            // 移动端优化输入体验
+            autoComplete="off"
           />
         </Form.Item>
         <Form.Item
-          name="duration"
-          label="持续时长（分钟）"
-          rules={[{ required: true, message: '请输入持续时长' }]}
+          label="开始"
+          style={{ marginBottom: 0 }}
         >
-          <InputNumber min={1} step={5} />
+          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            <Form.Item
+              name="start_date"
+              noStyle
+              rules={[
+                { required: true, message: '请选择开始日期!' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const endDate = getFieldValue('end_date');
+                    if (endDate && value) {
+                      const startDateObj = dayjs(value).startOf('day');
+                      const endDateObj = dayjs(endDate).startOf('day');
+                      if (endDateObj.isBefore(startDateObj)) {
+                        return Promise.reject(new Error('结束日期不能早于开始日期!'));
+                      }
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <DatePicker 
+                format="YYYY/MM/DD" 
+                style={{ width: '130px', marginRight: '-2px' }}
+                // 移动端使用弹出模式
+                popupMatchSelectWidth={window.innerWidth <= 768 ? false : true}
+                onChange={(date) => {
+                  setCurrentDate(date);
+                  // 清除开始日期的错误提示
+                  if (formRef.current) {
+                    formRef.current.setFields([{
+                      name: 'start_date',
+                      errors: []
+                    }]);
+                  }
+                }}
+              />
+            </Form.Item>
+            <Form.Item
+              name="start_time"
+              noStyle
+              rules={[
+                { required: true, message: '请选择开始时间!' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const startDate = getFieldValue('start_date');
+                    const endDate = getFieldValue('end_date');
+                    const endTime = getFieldValue('end_time');
+                    if (startDate && endDate && endTime && value) {
+                      const startDateTime = dayjs(startDate).hour(dayjs(value).hour()).minute(dayjs(value).minute());
+                      const endDateTime = dayjs(endDate).hour(dayjs(endTime).hour()).minute(dayjs(endTime).minute());
+                      if (endDateTime.isBefore(startDateTime)) {
+                        return Promise.reject(new Error('结束时间不能早于开始时间!'));
+                      }
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <TimePicker
+                format="HH:mm"
+                showTime={{
+                  disabledTime: disabledTime,
+                }}
+                placeholder="选择时间"
+                showNow={false}
+                style={{ width: '130px' }}
+                // 移动端使用弹出模式
+                popupMatchSelectWidth={window.innerWidth <= 768 ? false : true}
+                onChange={(time) => {
+                  setCurrentTime(time);
+                  // 清除开始时间的错误提示
+                  if (formRef.current) {
+                    formRef.current.setFields([{
+                      name: 'start_time',
+                      errors: []
+                    }]);
+                  }
+                }}
+              />
+            </Form.Item>
+          </div>
         </Form.Item>
+        <Form.Item
+          label="结束"
+          style={{ marginBottom: 0 }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            <Form.Item
+              name="end_date"
+              noStyle
+              rules={[
+                { required: true, message: '请选择结束日期!' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const startDate = getFieldValue('start_date');
+                    if (startDate && value) {
+                      const endDateObj = dayjs(value).startOf('day');
+                      const startDateObj = dayjs(startDate).startOf('day');
+                      if (endDateObj.isBefore(startDateObj)) {
+                        return Promise.reject(new Error('结束日期不能早于开始日期!'));
+                      }
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <DatePicker 
+                format="YYYY/MM/DD" 
+                style={{ width: '130px', marginRight: '-2px' }}
+                // 移动端使用弹出模式
+                popupMatchSelectWidth={window.innerWidth <= 768 ? false : true}
+                onChange={(date) => {
+                  setCurrentEndDate(date);
+                  // 清除结束日期的错误提示
+                  if (formRef.current) {
+                    formRef.current.setFields([{
+                      name: 'end_date',
+                      errors: []
+                    }]);
+                  }
+                }}
+              />
+            </Form.Item>
+            <Form.Item
+              name="end_time"
+              noStyle
+              rules={[
+                { required: true, message: '请选择结束时间!' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    const startDate = getFieldValue('start_date');
+                    const startTime = getFieldValue('start_time');
+                    const endDate = getFieldValue('end_date');
+                    if (startDate && startTime && endDate && value) {
+                      const startDateTime = dayjs(startDate).hour(dayjs(startTime).hour()).minute(dayjs(startTime).minute());
+                      const endDateTime = dayjs(endDate).hour(dayjs(value).hour()).minute(dayjs(value).minute());
+                      if (endDateTime.isBefore(startDateTime)) {
+                        return Promise.reject(new Error('结束时间不能早于开始时间!'));
+                      }
+                      // 检查时间差是否超过24小时
+                      const diffInMinutes = endDateTime.diff(startDateTime, 'minute');
+                      if (diffInMinutes > 24 * 60) {
+                        return Promise.reject(new Error('结束时间与开始时间的差值不能超过24小时!'));
+                      }
+                    }
+                    return Promise.resolve();
+                  },
+                }),
+              ]}
+            >
+              <TimePicker
+                format="HH:mm"
+                showTime={{
+                  disabledTime: disabledTime,
+                }}
+                placeholder="选择时间"
+                showNow={false}
+                style={{ width: '130px' }}
+                // 移动端使用弹出模式
+                popupMatchSelectWidth={window.innerWidth <= 768 ? false : true}
+                onChange={(time) => {
+                  setCurrentEndTime(time);
+                  // 清除结束时间的错误提示
+                  if (formRef.current) {
+                    formRef.current.setFields([{
+                      name: 'end_time',
+                      errors: []
+                    }]);
+                  }
+                }}
+              />
+            </Form.Item>
+          </div>
+        </Form.Item>
+
+        <Form.Item
+          name="only_user_join_type"
+          label="参会限制"
+          style={{ marginBottom: 16 }}
+        >
+          <Select 
+            placeholder="选择参会限制"
+            style={{ minWidth: 180 }}
+          >
+            <Option value={1}>所有成员可入会</Option>
+            <Option value={2}>仅受邀成员可入会</Option>
+            <Option value={3}>仅企业内部成员可入会</Option>
+          </Select>
+        </Form.Item>
+        {clientConfig.isShowWatermarkSwitch && (
+          <Form.Item
+            name="allow_screen_shared_watermark"
+            label="水印"
+            valuePropName="checked"
+            style={{ marginBottom: 16 }}
+          >
+            <Switch 
+              checkedChildren="开启"
+              unCheckedChildren="关闭"
+              style={{ minWidth: 100 }}
+            />
+          </Form.Item>
+        )}
         <Form.Item
           name="host"
           label="指定主持人"
           rules={[{ message: '请选择成员' }]}
+          style={{ marginBottom: 16 }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Button type="primary" onClick={() => handleChooseHost()}>选择主持人</Button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%' }}>
+              <Button 
+                type="primary" 
+                onClick={() => handleChooseHost()}
+                style={{ 
+                  marginBottom: 10, 
+                  width: '100%',
+                  padding: '10px 0',
+                  fontSize: window.innerWidth <= 768 ? '16px' : '14px'
+                }}
+              >选择主持人</Button>
             </div>
             {/* 主持人展示框 */}
             <div style={{
-              padding: '12px',
-              // border: '1px solid #d9d9d9',
+              padding: '8px',
+              backgroundColor: '#f5f5f5',
               borderRadius: '4px',
-              // backgroundColor: '#fafafa',
-              wordBreak: 'break-all'
+              wordBreak: 'break-all',
+              overflowX: 'auto',
+              whiteSpace: 'nowrap'
             }}>
               {selectedHosts && selectedHosts.length > 0 ? (
                 <div>
@@ -317,18 +599,29 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
           name="invitees"
           label="邀请成员"
           rules={[{ message: '请选择成员' }]}
+          style={{ marginBottom: 16 }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Button type="primary" onClick={() => handleChooseInvitee()}>选择邀请成员</Button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%' }}>
+              <Button 
+                type="primary" 
+                onClick={() => handleChooseInvitee()}
+                style={{ 
+                  marginBottom: 10, 
+                  width: '100%',
+                  padding: '10px 0',
+                  fontSize: window.innerWidth <= 768 ? '16px' : '14px'
+                }}
+              >选择邀请成员</Button>
             </div>
             {/* 邀请成员展示框 */}
             <div style={{
-              padding: '12px',
-              // border: '1px solid #d9d9d9',
+              padding: '8px',
+              backgroundColor: '#f5f5f5',
               borderRadius: '4px',
-              // backgroundColor: '#fafafa',
-              wordBreak: 'break-all'
+              wordBreak: 'break-all',
+              overflowX: 'auto',
+              whiteSpace: 'nowrap'
             }}>
               {selectedInvitees && selectedInvitees.length > 0 ? (
                 <div>
@@ -359,11 +652,30 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
             </div>
           </div>
         </Form.Item>
+        <Form.Item wrapperCol={{ xs: 24, sm: { span: 16, offset: 6 } }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: window.innerWidth <= 768 ? 'space-between' : 'flex-end', 
+            gap: 10, 
+            alignItems: 'center',
+            // 移动端全宽按钮
+            flexDirection: window.innerWidth <= 768 ? 'column' : 'row'
+          }}>
+            <Button onClick={handleCancel} style={{ 
+              width: window.innerWidth <= 768 ? '100%' : 'auto',
+              minWidth: window.innerWidth <= 768 ? '100%' : '120px',
+              padding: window.innerWidth <= 768 ? '12px 0' : '10px 20px',
+              fontSize: window.innerWidth <= 768 ? '16px' : '14px'
+            }}>取消</Button>
+            <Button type="primary" htmlType="submit" style={{ 
+              width: window.innerWidth <= 768 ? '100%' : 'auto',
+              minWidth: window.innerWidth <= 768 ? '100%' : '120px',
+              padding: window.innerWidth <= 768 ? '12px 0' : '10px 20px',
+              fontSize: window.innerWidth <= 768 ? '16px' : '14px'
+            }}>确定</Button>
+          </div>
+        </Form.Item>
       </Form>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, alignItems: 'center' }}>
-        <Button onClick={handleCancel}>取消</Button>
-        <Button type="primary" onClick={() => formRef.current?.submit()}>确定</Button>
-      </div>
     </Modal>
   );
 };

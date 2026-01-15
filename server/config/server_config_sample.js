@@ -17,7 +17,7 @@ const config = {
     wemeetRestAPISDKID: "",   //腾讯会议应用SDKID
     wemeetRestAPISecretID: "",   //腾讯会议API应用SecretID
     wemeetRestAPISecretKey: "",   //腾讯会议API应用SecretKey
-    wemmetWebhookToken: "",   //腾讯会议webhook回调token
+    wemeetWebhookToken: "",   //腾讯会议webhook回调token
     wemeetWebhookAESKey: "",   //腾讯会议webhook回调AES密钥
     wemeetSSOURL: "https://oauth2.account.tencent.com/v1/sso/jwtp/12xxx9/13xxx8/kit/meeting",   //腾讯会议IDaaS/Oneid免登链接前缀地址，需要替换成自己所在环境的地址
     wemeetRestAPIServerUrl: "https://api.meeting.qq.com",   //腾讯会议API应用服务地址，不需要替换

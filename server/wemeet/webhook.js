@@ -29,7 +29,7 @@ const webhookTaskQueue = new TaskQueue(serverConfig.webhookMaxConcurrent || 5);
  */
 function verifySignature(timestamp, nonce, data, signature) {
     // 1. 将token、timestamp、nonce、data按字典序排序
-    const arr = [serverConfig.wemmetWebhookToken, timestamp, nonce, data].sort();
+    const arr = [serverConfig.wemeetWebhookToken, timestamp, nonce, data].sort();
 
     // 2. 将排序后的字符串拼接成一个字符串
     const str = arr.join('');
@@ -369,7 +369,7 @@ async function webhookRecordingCompleted(eventData) {
     const meetingRecordId = recordListResult.record_meetings[0].meeting_record_id;
     const recordAddressResult = await queryMeetingRecordAddress(meetingRecordId, webhookMeetingInfo.creator.userid);
     if (!recordAddressResult || recordAddressResult.total_count === 0) {
-        logger.error("未获取到录制地址");
+        logger.warn("未获取到录制地址");
         return;
     }
     const recordViewAddress = recordAddressResult.record_files[0].view_address;
@@ -411,7 +411,7 @@ async function webhookRecordingCompleted(eventData) {
  */
 async function processWebhookEvent(eventData) {
     try {
-        logger.debug(`处理webhook事件: ${eventData.event}`);
+        logger.debug(`处理webhook事件: `, eventData);
         // 处理事件
         switch (eventData.event) {
             // 会议创建事件
@@ -487,9 +487,23 @@ async function handleEvent(ctx) {
             result = Buffer.from(data, 'base64').toString('utf8');
         }
 
+        if (!result) {
+            logger.warn('数据解密或解码失败');
+            ctx.throw(400, 'Data decryption or decoding failed');
+            return;
+        }
+
         // 解析JSON数据
-        const eventData = JSON.parse(result);
-        const eventType = eventData.event;
+        let eventData;
+        let eventType;
+        try {
+            eventData = JSON.parse(result);
+            eventType = eventData.event;
+        } catch (jsonError) {
+            logger.error('JSON解析失败:', jsonError);
+            ctx.throw(400, 'Invalid JSON data');
+            return;
+        }
 
         // 立即返回成功响应，不再等待后续处理完成
         ctx.status = 200;
