@@ -60,6 +60,7 @@ const createDatabaseMethod = (methodName) => {
   };
 };
 
+
 // 定义所有需要导出的数据库方法
 const databaseMethods = [
   'dbInsertIdToken',
@@ -73,8 +74,11 @@ const databaseMethods = [
   'dbDeleteTodoByMeetingid',
   'dbInsertCalendar',
   'dbGetCalendarByMeetingid',
-  'dbDeleteCalendarByMeetingid'
+  'dbDeleteCalendarByMeetingid',
+  'dbGetCalendarEventId',
+  'dbUpdateCalendar'
 ];
+
 
 // 立即创建并导出所有数据库方法的包装函数
 databaseMethods.forEach(method => {

@@ -3,7 +3,7 @@ import querystring from 'querystring';
 import { Buffer } from 'buffer';
 import serverConfig from '../config/server_config.js';
 import { logger } from '../util/logger.js';
-import { createMeetingCalendar } from '../feishuapi/feishuCalendar.js';
+import { createMeetingCalendar, updateMeetingCalendar, deleteMeetingCalendar } from '../feishuapi/feishuCalendar.js';
 import { createMeetingTask } from '../feishuapi/feishuTask.js';
 import { sendMeetingInfoCardMessage, sendRecordViewAddressCardMessage } from '../feishuapi/feishuRobot.js';
 import { queryMeetingById, queryMeetingRecordList, queryMeetingRecordAddress, queryMeetingParticipants } from './wemeetApi.js';
@@ -307,13 +307,13 @@ async function webhookCancelMeeting(eventData) {
         }
         if (serverConfig.calendarSwitch) {
             // 删除会议日程
-            await deleteMeetingCalendar(webhookMeetingInfo.creator.userid, webhookMeetingInfo.meeting_id);
+            await deleteMeetingCalendar(webhookMeetingInfo.meeting_id);
         }
     } else if (webhookMeetingInfo.meeting_type === 1) {
         // 周期会议通过日程通知
         // sub_meeting_id存在的话代表只取消某一场子会议，钉钉日程不支持取消单次日程，此时不更新日程
         if (!webhookMeetingInfo.sub_meeting_id) {
-            await deleteMeetingCalendar(webhookMeetingInfo.creator.userid, webhookMeetingInfo.meeting_id);
+            await deleteMeetingCalendar(webhookMeetingInfo.meeting_id);
         }
     }
 }
@@ -346,7 +346,7 @@ async function webhookEndMeeting(eventData) {
     // 会议结束时只删除待办，不删日程
     if (serverConfig.taskSwitch) {
         // 取消会议待办事项
-        await deleteMeetingTodo(webhookMeetingInfo.creator.userid, webhookMeetingInfo.meeting_id);
+        // await deleteMeetingTodo(webhookMeetingInfo.creator.userid, webhookMeetingInfo.meeting_id);
     }
 }
 
@@ -365,7 +365,7 @@ async function webhookRecordingCompleted(eventData) {
         logger.error("未获取到录制信息");
         return;
     }
-    ///////////////////////////////////////////////////////////////////////////////////存在多个录制文件时，这里可能会取到空值，需要看看
+    // 一场会议存在多个录制文件时，会发送多次录制完成事件，此时第一个文件可能还没生成完成，这里会取到空值，等后续事件再处理及可拿到文件地址
     const meetingRecordId = recordListResult.record_meetings[0].meeting_record_id;
     const recordAddressResult = await queryMeetingRecordAddress(meetingRecordId, webhookMeetingInfo.creator.userid);
     if (!recordAddressResult || recordAddressResult.total_count === 0) {

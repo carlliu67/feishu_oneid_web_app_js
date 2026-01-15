@@ -74,11 +74,11 @@ async function createTables() {
     // 创建calendar表
     await connection.query(`
       CREATE TABLE IF NOT EXISTS calendar (
-        meetingid VARCHAR(255) PRIMARY KEY,
+        meetingId VARCHAR(255) PRIMARY KEY,
         calendarId VARCHAR(255) NOT NULL,
-        event_id VARCHAR(255) NOT NULL,
-        userid VARCHAR(255) NOT NULL,
-        createtimestamp BIGINT NOT NULL
+        eventId VARCHAR(255) NOT NULL,
+        creatorUserId VARCHAR(255) NOT NULL,
+        startTimeStamp BIGINT NOT NULL
       )
     `);
     logger.info('Table "calendar" created successfully');
@@ -326,17 +326,17 @@ async function dbDeleteTodoByMeetingid(meetingid) {
 // calendar相关操作方法
 
 // 插入calendar数据
-async function dbInsertCalendar(meetingid, calendarId, event_id, userid, createtimestamp) {
+async function dbInsertCalendar(meetingId, calendarId, eventId, creatorUserId, startTimeStamp) {
   const connection = await getConnection();
   try {
-    // 确保createtimestamp是数字类型
-    const timestamp = typeof createtimestamp === 'number' ? createtimestamp : parseInt(createtimestamp);
+    // 确保startTimeStamp是数字类型
+    const timestamp = typeof startTimeStamp === 'number' ? startTimeStamp : parseInt(startTimeStamp);
     
     const [result] = await connection.execute(
-      'INSERT INTO calendar (meetingid, calendarId, event_id, userid, createtimestamp) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE calendarId = VALUES(calendarId), event_id = VALUES(event_id), userid = VALUES(userid), createtimestamp = VALUES(createtimestamp)',
-      [meetingid, calendarId, event_id, userid, timestamp]
+      'INSERT INTO calendar (meetingId, calendarId, eventId, creatorUserId, startTimeStamp) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE calendarId = VALUES(calendarId), eventId = VALUES(eventId), creatorUserId = VALUES(creatorUserId), startTimeStamp = VALUES(startTimeStamp)',
+      [meetingId, calendarId, eventId, creatorUserId, timestamp]
     );
-    logger.debug(`dbInsertCalendar calendarId: ${calendarId}, event_id: ${event_id}, userid: ${userid}, meetingid: ${meetingid}, createtimestamp: ${timestamp} inserted successfully`);
+    logger.debug(`dbInsertCalendar calendarId: ${calendarId}, eventId: ${eventId}, creatorUserId: ${creatorUserId}, meetingId: ${meetingId}, startTimeStamp: ${timestamp} inserted successfully`);
     return 'dbInsertCalendar inserted successfully';
   } catch (err) {
     logger.error('dbInsertCalendar failed:', err.message);
@@ -346,28 +346,30 @@ async function dbInsertCalendar(meetingid, calendarId, event_id, userid, createt
   }
 }
 
-// 根据meetingid查询calendar数据
-async function dbGetCalendarByMeetingid(meetingid) {
-  if (!meetingid) {
-    throw new Error('Error: meetingid is required');
+// 根据meetingId查询calendar数据
+async function dbGetCalendarByMeetingid(meetingId) {
+  if (!meetingId) {
+    throw new Error('Error: meetingId is required');
   }
   const connection = await getConnection();
   try {
+    // 尝试使用完整的日历信息查询，这样即使列名不同也能获取到需要的信息
     const [rows] = await connection.execute(
-      'SELECT meetingid, scheduleId, unionid, createtimestamp FROM calendar WHERE meetingid = ?',
-      [meetingid]
+      'SELECT * FROM calendar WHERE meetingId = ?',
+      [meetingId]
     );
     
     if (rows.length > 0) {
-      // 确保createtimestamp是数字类型，保持接口一致性
+      // 确保startTimeStamp是数字类型，保持接口一致性
       const result = {...rows[0]};
-      if (result.createtimestamp !== undefined) {
-        result.createtimestamp = Number(result.createtimestamp);
+      if (result.startTimeStamp !== undefined) {
+        result.startTimeStamp = Number(result.startTimeStamp);
       }
-      logger.debug(`查询日历信息成功: ${meetingid}`);
+      
+      logger.debug(`查询日历信息成功: ${meetingId}`);
       return result;
     } else {
-      logger.debug(`未找到日历信息: ${meetingid}`);
+      logger.debug(`未找到日历信息: ${meetingId}`);
       return null;
     }
   } catch (err) {
@@ -379,17 +381,17 @@ async function dbGetCalendarByMeetingid(meetingid) {
 }
 
 // 删除calendar数据
-async function dbDeleteCalendarByMeetingid(meetingid) {
-  if (!meetingid) {
-    throw new Error('Error: meetingid is required');
+async function dbDeleteCalendarByMeetingid(meetingId) {
+  if (!meetingId) {
+    throw new Error('Error: meetingId is required');
   }
   const connection = await getConnection();
   try {
     const [result] = await connection.execute(
-      'DELETE FROM calendar WHERE meetingid = ?',
-      [meetingid]
+      'DELETE FROM calendar WHERE meetingId = ?',
+      [meetingId]
     );
-    logger.debug(`Calendar data deleted meetingid: ${meetingid}`);
+    logger.debug(`Calendar data deleted meetingId: ${meetingId}`);
     return 'Calendar data deleted successfully';
   } catch (err) {
     logger.error('dbDeleteCalendarByMeetingid failed:', err.message);
@@ -398,6 +400,59 @@ async function dbDeleteCalendarByMeetingid(meetingid) {
     connection.release();
   }
 }
+
+// 根据meetingId获取日历事件ID
+async function dbGetCalendarEventId(meetingId) {
+  if (!meetingId) {
+    throw new Error('Error: meetingId is required');
+  }
+  const connection = await getConnection();
+  try {
+    // 尝试使用完整的日历信息查询，这样即使列名不同也能获取到需要的信息
+    const [rows] = await connection.execute(
+      'SELECT * FROM calendar WHERE meetingId = ?',
+      [meetingId]
+    );
+    
+    if (rows.length > 0) {
+      logger.debug(`查询日历事件ID成功: ${meetingId}`);
+      return rows[0].eventId;
+    } else {
+      logger.debug(`未找到日历事件ID: ${meetingId}`);
+      return null;
+    }
+  } catch (err) {
+    logger.error('查询日历事件ID失败:', err.message);
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
+// 更新日历数据
+async function dbUpdateCalendar(meetingId, calendarId, eventId, creatorUserId, startTimeStamp) {
+  if (!meetingId) {
+    throw new Error('Error: meetingId is required');
+  }
+  const connection = await getConnection();
+  try {
+    // 确保startTimeStamp是数字类型
+    const timestamp = typeof startTimeStamp === 'number' ? startTimeStamp : parseInt(startTimeStamp);
+    
+    const [result] = await connection.execute(
+      'UPDATE calendar SET calendarId = ?, eventId = ?, creatorUserId = ?, startTimeStamp = ? WHERE meetingId = ?',
+      [calendarId, eventId, creatorUserId, timestamp, meetingId]
+    );
+    logger.debug(`更新日历数据成功: ${meetingId}`);
+    return 'Calendar data updated successfully';
+  } catch (err) {
+    logger.error('更新日历数据失败:', err.message);
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
 
 // 为了保持与sqlite.js的接口一致性，导出相应的方法
 export {
@@ -414,6 +469,8 @@ export {
   dbInsertCalendar,
   dbGetCalendarByMeetingid,
   dbDeleteCalendarByMeetingid,
+  dbGetCalendarEventId,
+  dbUpdateCalendar,
   // 额外导出初始化方法，方便应用启动时初始化数据库
   initDatabase
 };
