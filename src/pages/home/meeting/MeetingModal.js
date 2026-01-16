@@ -155,29 +155,29 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
     setSelectedInvitees(newSelectedInvitees);
   };
 
-  // 处理选择主持人//////////////////////////////////////////////////////////////////////
+  // 处理选择主持人
   const handleChooseHost = async () => {
     window.h5sdk.ready(() => {
       window.tt.chooseContact({
         multi: true,
         ignore: true,
         maxNum: 50,
-        limitTips: "选择人数不能超过50个",
+        limitTips: "选择主持人人数不能超过50个",
         externalContact: false,
         enableChooseDepartment: false,
         chosenIds: selectedHosts.map(host => host.id),
         success(res) {
-          frontendLogger.info('选择人员结果', { result: res });
+          frontendLogger.info('选择主持人结果', { result: res });
 
-          if (res && Array.isArray(res.users) && res.users.length > 0) {
-              // 确认返回的是一个用户对象数组 [{ name, avatar, emplId }, ...]
-              const hosts = res.users.map((user) => ({
-                id: user.emplId,
-                name: user.name
+          if (res && Array.isArray(res.data) && res.data.length > 0) {
+              // 主持人可以选择多个，最多50个
+              const hosts = res.data.map((user) => ({
+                id: user.openId,
+                name: user.name || user.i18nNames?.zh_cn || '未知用户'
               }));
 
-              frontendLogger.info('解析到人员数据', { hosts });
-              setSelectedHosts(hosts); // 设置选中的人员数据
+              frontendLogger.info('解析到主持人数据', { hosts });
+              setSelectedHosts(hosts); // 设置选中的主持人
 
           } else {
             // 如果返回的不是预期的数组结构或数组为空
@@ -185,13 +185,13 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
           }
         },
         fail(res) {
-          console.log(`chooseContact fail: ${JSON.stringify(res)}`);
+          frontendLogger.error('选择主持人失败', { error: res });
         }
       });
     });
   };
 
-  // 处理选择邀请人//////////////////////////////////////////////////////////////////////
+  // 处理选择邀请人
   const handleChooseInvitee = async () => {
     window.h5sdk.ready(() => {
       window.tt.chooseContact({
@@ -205,11 +205,11 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
         success(res) {
           frontendLogger.info('选择邀请成员结果', { result: res });
 
-          if (res && Array.isArray(res.users) && res.users.length > 0) {
-              // 确认返回的是一个用户对象数组 [{ name, avatar, emplId }, ...]
-              const invitees = res.users.map((user) => ({
-                id: user.emplId,
-                name: user.name
+          if (res && Array.isArray(res.data) && res.data.length > 0) {
+              // 确认返回的是一个用户对象数组
+              const invitees = res.data.map((user) => ({
+                id: user.openId,
+                name: user.name || user.i18nNames?.zh_cn || '未知用户'
               }));
 
               frontendLogger.info('解析到邀请成员数据', { invitees });
@@ -221,7 +221,7 @@ const MeetingModal = ({ visible, onCancel, onCreate, userInfo }) => {
           }
         },
         fail(res) {
-          console.log(`chooseContact fail: ${JSON.stringify(res)}`);
+          frontendLogger.error('选择邀请人失败', { error: res });
         }
       });
     });

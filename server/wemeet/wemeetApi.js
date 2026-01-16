@@ -4,6 +4,7 @@ import { logger } from '../util/logger.js';
 import { configAccessControl, okResponse, failResponse } from '../server_util.js';
 import serverConfig from '../config/server_config.js';
 import { isLogin, getUserid } from '../feishuapi/feishuAuth.js';
+import { batchGetUserInfo } from '../feishuapi/feishuUtil.js';
 
 const LJ_TOKEN_KEY = 'lk_token';
 const WEMEET_VERSION = 'wemeet-feishu-js/v1.0.1'
@@ -190,6 +191,16 @@ async function queryMeetingParticipants(meeting_id, userid) {
 }
 
 /**
+ * 将openid数组转换为userid数组
+ * @param {string[]} openIds - openid数组
+ * @param {Object} userMap - openid到userid的映射
+ * @returns {string[]} userid数组
+ */
+function convertOpenIdsToUserIds(openIds, userMap) {
+  return openIds.map(openId => userMap[openId] || openId);
+}
+
+/**
  * 处理创建会议请求
  * @param {Object} ctx - Koa上下文
  */
@@ -210,6 +221,21 @@ async function handleCreateMeeting(ctx) {
         const uri = "/v1/meetings";
         meetingParams = JSON.parse(ctx.request.body.data);
         meetingParams.userid = getUserid(ctx);
+        
+        // 转换主持人openid为userid
+        if (meetingParams.hosts && meetingParams.hosts.length > 0) {
+          const hostUserMap = await batchGetUserInfo(meetingParams.hosts);
+          logger.info('主持人openid到userid的映射:', hostUserMap);
+          meetingParams.hosts = convertOpenIdsToUserIds(meetingParams.hosts, hostUserMap);
+        }
+        
+        // 转换参会人openid为userid
+        if (meetingParams.invitees && meetingParams.invitees.length > 0) {
+          const inviteeUserMap = await batchGetUserInfo(meetingParams.invitees);
+          logger.info('参会人openid到userid的映射:', inviteeUserMap);
+          meetingParams.invitees = convertOpenIdsToUserIds(meetingParams.invitees, inviteeUserMap);
+        }
+        
         requestConfig = createRequestConfig('POST', uri, meetingParams);
         // 创建会议日志记录下来
         logger.info("创建会议请求参数: ", requestConfig);

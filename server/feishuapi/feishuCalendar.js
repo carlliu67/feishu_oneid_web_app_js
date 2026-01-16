@@ -334,6 +334,5 @@ async function deleteMeetingCalendar(meetingId) {
 export {
     createMeetingCalendar, 
     updateMeetingCalendar,
-    deleteMeetingCalendar,
-    getTenantAccessToken
+    deleteMeetingCalendar
 };

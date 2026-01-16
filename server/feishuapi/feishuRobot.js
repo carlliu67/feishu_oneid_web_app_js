@@ -2,7 +2,7 @@ import lark from '@larksuiteoapi/node-sdk';
 
 import { logger } from '../util/logger.js';
 import { genH5AppLinkMeetingCode, genH5AppLinkMeetingUrl } from './feishuUtil.js';
-import { getTenantAccessToken } from './feishuCalendar.js';
+import { getTenantAccessToken } from './feishuUtil.js';
 import { client } from './feishuClient.js';
 
 // 发送会议卡片消息
