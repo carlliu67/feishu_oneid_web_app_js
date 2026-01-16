@@ -58,6 +58,7 @@ async function createCalendar(tenant_access_token, calendar_id, meetingInfo) {
                     description: '加入视频会议',
                     meeting_url: meeting_url,
                 },
+                attendee_ability: 'can_see_others',
             },
         },
         lark.withTenantToken(tenant_access_token)
