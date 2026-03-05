@@ -1,25 +1,26 @@
+import dotenv from 'dotenv';
+
+// 加载环境变量
+dotenv.config();
+
 const config = {
-    feishuAppId: "", //网页应用appId
-    feishuAppSecret: "", //网页应用secret
-    feishuAppName: "腾讯会议", //网页应用名称
-    feishuHomeUrl: "http://feishu-test.company.cn:9000", //网页应用首页地址
+    feishuAppId: process.env.FEISHU_APP_ID || "", //网页应用appId
+    feishuAppSecret: process.env.FEISHU_APP_SECRET || "", //网页应用secret
+    feishuAppName: process.env.FEISHU_APP_NAME || "腾讯会议", //网页应用名称
+    feishuHomeUrl: process.env.FEISHU_HOME_URL || "", //网页应用首页地址
     calendarSwitch: true, //预约普通会议是是否创建钉钉日程，对周期会议不生效，周期会议固定会创建日程
-    // taskSwitch: true, //预约普通会议是是否创建钉钉待办，对周期会议不生效，周期会议固定会创建日程。暂未支持
 
     // server运行参数配置
-    apiPort: "9001",   //后端指定端口
-    // 当APP server和webhook server部署在同一台机器上时，appServerMode和webhookServerMode都需要设置为true；分开部署时一个为true，一个为false
-    appServerMode: true,  //是否开启app server模式
-    webhookServerMode: true,  //是否开启webhook server模式
+    apiPort: process.env.API_PORT || "9001",   //后端指定端口
 
     // 腾讯会议对接参数
-    wemeetAPPID: "",   //腾讯会议应用APPID
-    wemeetRestAPISDKID: "",   //腾讯会议应用SDKID
-    wemeetRestAPISecretID: "",   //腾讯会议API应用SecretID
-    wemeetRestAPISecretKey: "",   //腾讯会议API应用SecretKey
-    wemeetWebhookToken: "",   //腾讯会议webhook回调token
-    wemeetWebhookAESKey: "",   //腾讯会议webhook回调AES密钥
-    wemeetSSOURL: "https://oauth2.account.tencent.com/v1/sso/jwtp/12xxx9/13xxx8/kit/meeting",   //腾讯会议IDaaS/Oneid免登链接前缀地址，需要替换成自己所在环境的地址
+    wemeetAPPID: process.env.WEMEET_APPID || "",   //腾讯会议应用APPID
+    wemeetRestAPISDKID: process.env.WEMEET_REST_API_SDKID || "",   //腾讯会议应用SDKID
+    wemeetRestAPISecretID: process.env.WEMEET_REST_API_SECRETID || "",   //腾讯会议API应用SecretID
+    wemeetRestAPISecretKey: process.env.WEMEET_REST_API_SECRETKEY || "",   //腾讯会议API应用SecretKey
+    wemeetWebhookToken: process.env.WEMEET_WEBHOOK_TOKEN || "",   //腾讯会议webhook回调token
+    wemeetWebhookAESKey: process.env.WEMEET_WEBHOOK_AESKEY || "",   //腾讯会议webhook回调AES密钥
+    wemeetSSOURL: process.env.WEMEET_SSOURL || "",   //腾讯会议IDaaS/Oneid免登链接前缀地址，需要替换成自己所在环境的地址
     wemeetRestAPIServerUrl: "https://api.meeting.qq.com",   //腾讯会议API应用服务地址，不需要替换
 
     // app server接口配置，这部分参数不要修改
@@ -39,15 +40,19 @@ const config = {
     webhookMaxConcurrent: 5, // 最大并发处理数
 
     // 数据库对接参数
-    dbType: "sqlite", // 数据库类型："sqlite" 或 "mysql"
-    dbHost: "", // MySQL 数据库主机
-    dbPort: 3306, // MySQL 数据库端口
-    dbUser: "", // MySQL 数据库用户名
-    dbPassword: "", // MySQL 数据库密码
-    dbDatabase: "", // MySQL 数据库名称
+    dbType: process.env.DB_TYPE || "sqlite", // 数据库类型："sqlite" 或 "mysql"
+    dbHost: process.env.DB_HOST || "", // MySQL 数据库主机
+    dbPort: process.env.DB_PORT || 3306, // MySQL 数据库端口
+    dbUser: process.env.DB_USER || "", // MySQL 数据库用户名
+    dbPassword: process.env.DB_PASSWORD || "", // MySQL 数据库密码
+    dbDatabase: process.env.DB_DATABASE || "", // MySQL 数据库名称
 
     // 服务端日志打印
-    logLevel: "info", // 日志级别，可选值：debug, info, warn, error
+    logLevel: process.env.LOG_LEVEL || "info", // 日志级别，可选值：debug, info, warn, error
+    
+    // 保持alive配置
+    keepAlivePath: "/keepalive",
+    keepAliveResponse: "ok"
 };
 
 export default config;

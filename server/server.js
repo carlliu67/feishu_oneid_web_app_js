@@ -33,32 +33,28 @@ app.use(session(koaSessionConfig, app));
 // 使用 koa-bodyparser 中间件
 app.use(bodyParser());
 
-if (serverConfig.appServerMode) {
-    // 处理OPTIONS预检请求
-    router.options('/api/:path*', (ctx) => {
-        ctx.status = 204;
-        // 不设置任何CORS头，让Nginx处理
-    });
-    
-    // 注册服务端路由和处理
-    router.get(serverConfig.getUserAccessTokenPath, getUserAccessToken)
-    router.get(serverConfig.getSignParametersPath, getSignParameters)
-    router.post(serverConfig.createMeetingPath, handleCreateMeeting)
-    router.get(serverConfig.queryUserEndedMeetingListPath, handleQueryUserEndedMeetingList)
-    router.get(serverConfig.queryUserMeetingListPath, handleQueryUserMeetingList)
-    router.get(serverConfig.generateJoinSchemePath, handleGenerateJoinScheme)
-    router.get(serverConfig.generateJumpUrlPath, handleGenerateJumpUrl)
-    router.get(serverConfig.generateJoinUrlPath, handleGenerateJoinUrl)
-    
-    // 前端日志接收接口
-    router.post('/api/logs', handleFrontendLogs)
-}
+// 处理OPTIONS预检请求
+router.options('/api/:path*', (ctx) => {
+    ctx.status = 204;
+    // 不设置任何CORS头，让Nginx处理
+});
 
-if (serverConfig.webhookServerMode) {
-    // webhook相关路由和处理
-    router.get(serverConfig.webhookPath, handleVerification);
-    router.post(serverConfig.webhookPath, handleEvent);
-}
+// 注册服务端路由和处理
+router.get(serverConfig.getUserAccessTokenPath, getUserAccessToken)
+router.get(serverConfig.getSignParametersPath, getSignParameters)
+router.post(serverConfig.createMeetingPath, handleCreateMeeting)
+router.get(serverConfig.queryUserEndedMeetingListPath, handleQueryUserEndedMeetingList)
+router.get(serverConfig.queryUserMeetingListPath, handleQueryUserMeetingList)
+router.get(serverConfig.generateJoinSchemePath, handleGenerateJoinScheme)
+router.get(serverConfig.generateJumpUrlPath, handleGenerateJumpUrl)
+router.get(serverConfig.generateJoinUrlPath, handleGenerateJoinUrl)
+
+// 前端日志接收接口
+router.post('/api/logs', handleFrontendLogs)
+
+// webhook相关路由和处理
+router.get(serverConfig.webhookPath, handleVerification);
+router.post(serverConfig.webhookPath, handleEvent);
 
 // 保持alive路由
 router.get(serverConfig.keepAlivePath, (ctx) => {

@@ -66,7 +66,7 @@ async function batchGetUserInfo(openIds) {
 
   try {
     const tenantAccessToken = await getTenantAccessToken();
-    logger.debug('批量获取用户信息 - tenantAccessToken获取成功');
+    // logger.debug('批量获取用户信息 - tenantAccessToken获取成功');
     
     const userMap = {};
     const batchSize = 50; // 飞书API限制一次最多50个
@@ -74,14 +74,14 @@ async function batchGetUserInfo(openIds) {
     // 分批处理，每次最多50个
     for (let i = 0; i < openIds.length; i += batchSize) {
       const batchOpenIds = openIds.slice(i, i + batchSize);
-      logger.debug(`批量获取用户信息 - 处理批次 ${Math.floor(i/batchSize) + 1}，openIds数量: ${batchOpenIds.length}`);
+    //   logger.debug(`批量获取用户信息 - 处理批次 ${Math.floor(i/batchSize) + 1}，openIds数量: ${batchOpenIds.length}`);
       
       // 构建当前批次的URL，处理user_ids参数
       let url = 'https://open.feishu.cn/open-apis/contact/v3/users/batch?user_id_type=open_id';
       batchOpenIds.forEach(openId => {
         url += `&user_ids=${encodeURIComponent(openId)}`;
       });
-      logger.debug(`批量获取用户信息 - 批次 ${Math.floor(i/batchSize) + 1} 请求URL: ${url}`);
+    //   logger.debug(`批量获取用户信息 - 批次 ${Math.floor(i/batchSize) + 1} 请求URL: ${url}`);
       
       const response = await axios.get(url, {
         headers: {
@@ -94,17 +94,16 @@ async function batchGetUserInfo(openIds) {
 
       if (response.data.code === 0) {
         // 合并当前批次的结果到userMap
-        logger.debug(`批量获取用户信息 - 批次 ${Math.floor(i/batchSize) + 1} 响应data:`, response.data.data);
         const userList = response.data.data?.items || [];
-        logger.debug(`批量获取用户信息 - 批次 ${Math.floor(i/batchSize) + 1} items:`, userList);
+        // logger.debug(`批量获取用户信息 - 批次 ${Math.floor(i/batchSize) + 1} items:`, userList);
         
         if (Array.isArray(userList)) {
           logger.debug(`批量获取用户信息 - 批次 ${Math.floor(i/batchSize) + 1} items长度: ${userList.length}`);
           userList.forEach(user => {
-            logger.debug(`批量获取用户信息 - 处理用户:`, user);
+            // logger.debug(`批量获取用户信息 - 处理用户:`, user);
             if (user.open_id && user.user_id) {
               userMap[user.open_id] = user.user_id;
-              logger.debug(`批量获取用户信息 - 添加映射: ${user.open_id} -> ${user.user_id}`);
+            //   logger.debug(`批量获取用户信息 - 添加映射: ${user.open_id} -> ${user.user_id}`);
             } else {
               logger.warn(`批量获取用户信息 - 用户缺少必要字段:`, user);
             }
