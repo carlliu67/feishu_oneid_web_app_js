@@ -48,6 +48,12 @@ const config = {
     dbUser: process.env.DB_USER || "", // MySQL 数据库用户名
     dbPassword: process.env.DB_PASSWORD || "", // MySQL 数据库密码
     dbDatabase: process.env.DB_DATABASE || "", // MySQL 数据库名称
+    
+    // Redis对接参数
+    redisHost: process.env.REDIS_HOST || "localhost", // Redis 主机
+    redisPort: process.env.REDIS_PORT || 6379, // Redis 端口
+    redisPassword: process.env.REDIS_PASSWORD || "", // Redis 密码
+    redisDB: process.env.REDIS_DB || 0, // Redis 数据库索引
 
     // 服务端日志打印
     logLevel: process.env.LOG_LEVEL || "info", // 日志级别，可选值：debug, info, warn, error

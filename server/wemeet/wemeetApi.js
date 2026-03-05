@@ -209,9 +209,9 @@ async function handleCreateMeeting(ctx) {
     logger.debug("\n-------------------[创建会议 BEGIN]-----------------------------");
     configAccessControl(ctx);
     
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.debug("-------------------[创建会议 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[创建会议 用户未登录 END]-----------------------------");
         return;
     }
 
@@ -221,7 +221,7 @@ async function handleCreateMeeting(ctx) {
     try {
         const uri = "/v1/meetings";
         meetingParams = JSON.parse(ctx.request.body.data);
-        meetingParams.userid = getUserid(ctx);
+        meetingParams.userid = await getUserid(ctx);
         
         // 转换主持人openid为userid
         if (meetingParams.hosts && meetingParams.hosts.length > 0) {
@@ -266,9 +266,9 @@ async function handleQueryUserEndedMeetingList(ctx) {
     logger.debug("\n-------------------[查询用户已结束会议列表 BEGIN]-----------------------------");
     configAccessControl(ctx);
     
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.debug("-------------------[查询用户已结束会议列表 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[查询用户已结束会议列表 用户未登录 END]-----------------------------");
         return;
     }
 
@@ -284,7 +284,7 @@ async function handleQueryUserEndedMeetingList(ctx) {
         return;
     }
 
-    const uri = `/v1/history/meetings/${getUserid(ctx)}?page_size=${page_size}&page=${page}`;
+    const uri = `/v1/history/meetings/${await getUserid(ctx)}?page_size=${page_size}&page=${page}`;
     const requestConfig = createRequestConfig('GET', uri);
 
     try {
@@ -310,9 +310,9 @@ async function handleQueryUserMeetingList(ctx) {
     logger.debug("\n-------------------[查询用户会议列表 BEGIN]-----------------------------");
     configAccessControl(ctx);
     
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.debug("-------------------[查询用户会议列表 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[查询用户会议列表 用户未登录 END]-----------------------------");
         return;
     }
 
@@ -328,7 +328,7 @@ async function handleQueryUserMeetingList(ctx) {
         return;
     }
 
-    const uri = `/v1/meetings?userid=${getUserid(ctx)}&instanceid=1`;
+    const uri = `/v1/meetings?userid=${await getUserid(ctx)}&instanceid=1`;
     const requestConfig = createRequestConfig('GET', uri);
 
     try {
@@ -354,13 +354,13 @@ async function handleGetUserInfo(ctx) {
     logger.debug("\n-------------------[获取用户详情 BEGIN]-----------------------------");
     configAccessControl(ctx);
     
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
         logger.debug("-------------------[获取用户详情 用户未登录 END]-----------------------------");
         return;
     }
 
-    const userid = getUserid(ctx);
+    const userid = await getUserid(ctx);
     let operator_id = getAdminUserid();
     let uri = `/v1/users/${userid}?operator_id=${operator_id}&operator_id_type=1`;
     let requestConfig = createRequestConfig('GET', uri);

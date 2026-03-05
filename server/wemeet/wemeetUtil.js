@@ -217,16 +217,16 @@ async function handleGenerateJoinScheme(ctx) {
     logger.debug("\n-------------------[获取scheme免登url BEGIN]-----------------------------");
     configAccessControl(ctx);
 
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.debug("-------------------[获取scheme免登url 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[获取scheme免登url 用户未登录 END]-----------------------------");
         return;
     }
 
     let meetingCode = ctx.query["meetingCode"] || "";
 
     const cookieJar = new CookieJar();
-    const userid = getUserid(ctx);
+    const userid = await getUserid(ctx);
     var initialUrl = await generateJoinUrl("https://meeting.tencent.com", userid);
     let userCode = "";
     let schemeUrl = "";
@@ -292,9 +292,9 @@ async function handleGenerateJumpUrl(ctx) {
     logger.debug("\n-------------------[获取免登url BEGIN]-----------------------------");
     configAccessControl(ctx);
 
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.debug("-------------------[获取免登url 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[获取免登url 用户未登录 END]-----------------------------");
         return;
     }
     let originUrl = ctx.query["meetingUrl"] || "";
@@ -304,7 +304,7 @@ async function handleGenerateJumpUrl(ctx) {
     }
 
     const cookieJar = new CookieJar();
-    const userid = getUserid(ctx);
+    const userid = await getUserid(ctx);
     var initialUrl = await generateJumpUrl(originUrl, userid);
     let ssoAuthCode = "";
     let jumpUrl = "";
@@ -358,9 +358,9 @@ async function handleGenerateJoinUrl(ctx) {
     logger.debug("\n-------------------[获取免登入会url BEGIN]-----------------------------");
     configAccessControl(ctx);
 
-    if (isLogin(ctx) === false) {
+    if (!(await isLogin(ctx))) {
         ctx.body = failResponse("用户未登录，请先登录");
-        logger.debug("-------------------[获取免登入会url 用户未登录 END]-----------------------------\n");
+        logger.debug("-------------------[获取免登入会url 用户未登录 END]-----------------------------");
         return;
     }
     let originUrl = ctx.query["meetingUrl"] || "";
@@ -369,7 +369,7 @@ async function handleGenerateJoinUrl(ctx) {
         return;
     }
 
-    const userid = getUserid(ctx);
+    const userid = await getUserid(ctx);
     const joinUrl = await generateJoinUrl(originUrl, userid);
     ctx.body = okResponse(joinUrl);
     logger.debug("joinUrl: " + joinUrl);

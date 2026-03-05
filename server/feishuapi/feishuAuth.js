@@ -4,25 +4,50 @@ import axios from 'axios';
 import { logger } from '../util/logger.js';
 import serverConfig from '../config/server_config.js'; // 根据实际路径调整
 import { configAccessControl, okResponse, failResponse, setCookie } from '../server_util.js';
+import { setAuthInfo, getAuthInfo } from '../util/redisManager.js';
 
 const LJ_JSTICKET_KEY = 'lk_jsticket'
 const LJ_TOKEN_KEY = 'lk_token'
+const REDIS_PREFIX = 'feishu_auth:'
 
 // 判断是否已登录
-function isLogin(ctx) {
-    const accessToken = ctx.session.userinfo;
+async function isLogin(ctx) {
+    // 首先尝试从Session获取
     const lkToken = ctx.cookies.get(LJ_TOKEN_KEY) || '';
-    if (accessToken && accessToken.access_token && lkToken.length > 0 && accessToken.access_token === lkToken) {
-        return true
-    } else {
-        return false
+    const sessionAccessToken = ctx.session.userinfo;
+    if (sessionAccessToken && sessionAccessToken.access_token && lkToken.length > 0 && sessionAccessToken.access_token === lkToken) {
+        return true;
     }
+    
+    // 回退到使用Redis
+    if (lkToken) {
+        const accessToken = await getAuthInfo(`${REDIS_PREFIX}user_${lkToken}`);
+        if (accessToken && accessToken.access_token === lkToken) {
+            return true;
+        }
+    }
+    
+    return false;
 }
 
 // 获取userid
-function getUserid(ctx) {
-    const accessToken = ctx.session.userinfo;
-    return accessToken.user_id || '';
+async function getUserid(ctx) {
+    // 首先尝试从Session获取
+    const sessionAccessToken = ctx.session.userinfo;
+    if (sessionAccessToken) {
+        return sessionAccessToken.user_id || '';
+    }
+    
+    // 回退到使用Redis
+    const lkToken = ctx.cookies.get(LJ_TOKEN_KEY) || '';
+    if (lkToken) {
+        const accessToken = await getAuthInfo(`${REDIS_PREFIX}user_${lkToken}`);
+        if (accessToken) {
+            return accessToken.user_id || '';
+        }
+    }
+    
+    return '';
 }
 
 //处理免登请求，返回用户的user_access_token
@@ -31,13 +56,26 @@ async function getUserAccessToken(ctx) {
     logger.info("\n-------------------[接入服务端免登处理 BEGIN]-----------------------------")
     configAccessControl(ctx)
     logger.info(`接入服务方第① 步: 接收到前端免登请求`)
-    const accessToken = ctx.session.userinfo
     const lkToken = ctx.cookies.get(LJ_TOKEN_KEY) || ''
-    if (accessToken && accessToken.access_token && lkToken.length > 0 && accessToken.access_token == lkToken) {
+    
+    // 首先尝试从Session获取
+    const sessionAccessToken = ctx.session.userinfo
+    if (sessionAccessToken && sessionAccessToken.access_token && lkToken.length > 0 && sessionAccessToken.access_token == lkToken) {
         logger.info("接入服务方第② 步: 从Session中获取user_access_token信息，用户已登录")
-        ctx.body = okResponse(accessToken)
+        ctx.body = okResponse(sessionAccessToken)
         logger.info("-------------------[接入服务端免登处理 END]-----------------------------\n")
         return
+    }
+    
+    // 回退到使用Redis
+    if (lkToken) {
+        const redisAccessToken = await getAuthInfo(`${REDIS_PREFIX}user_${lkToken}`);
+        if (redisAccessToken && redisAccessToken.access_token === lkToken) {
+            logger.info("接入服务方第② 步: 从Redis中获取user_access_token信息，用户已登录")
+            ctx.body = okResponse(redisAccessToken)
+            logger.info("-------------------[接入服务端免登处理 END]-----------------------------\n")
+            return
+        }
     }
 
     let code = ctx.query["code"] || ""
@@ -84,13 +122,16 @@ async function getUserAccessToken(ctx) {
         return
     }
 
-    logger.info("接入服务方第⑥ 步: 获取颁发的用户授权码凭证的user_access_token, 更新到Session，返回给前端")
+    logger.info("接入服务方第⑥ 步: 获取颁发的用户授权码凭证的user_access_token, 更新到Session和Redis，返回给前端")
     const newAccessToken = authenv1Res.data.data
     if (newAccessToken) {
         ctx.session.userinfo = newAccessToken
-        // console.log("newAccessToken", newAccessToken)
-        // console.log("newAccessToken.access_token", newAccessToken.access_token)
-        setCookie(ctx, LJ_TOKEN_KEY, newAccessToken.access_token || '')
+        const accessToken = newAccessToken.access_token || ''
+        setCookie(ctx, LJ_TOKEN_KEY, accessToken)
+        
+        // 存储到Redis，过期时间设置为与access_token相同
+        const expiration = newAccessToken.expires_in || 7200 // 默认2小时
+        await setAuthInfo(`${REDIS_PREFIX}user_${accessToken}`, newAccessToken, expiration)
     } else {
         setCookie(ctx, LJ_TOKEN_KEY, '')
     }
@@ -108,9 +149,19 @@ async function getSignParameters(ctx) {
     logger.info(`接入服务方第① 步: 接收到前端鉴权请求`)
 
     const url = ctx.query["url"] || ""
-    const tickeString = ctx.cookies.get(LJ_JSTICKET_KEY) || ""
+    let tickeString = ctx.cookies.get(LJ_JSTICKET_KEY) || ""
+    
+    // 首先尝试从Cookie获取，本地不存在时再从Redis获取
+    if (!tickeString) {
+        const redisTicket = await getAuthInfo(`${REDIS_PREFIX}jsapi_ticket`);
+        if (redisTicket) {
+            tickeString = redisTicket;
+            setCookie(ctx, LJ_JSTICKET_KEY, tickeString);
+        }
+    }
+    
     if (tickeString.length > 0) {
-        logger.info(`接入服务方第② 步: Cookie中获取jsapi_ticket，计算JSAPI鉴权参数，返回`)
+        logger.info(`接入服务方第② 步: 获取jsapi_ticket，计算JSAPI鉴权参数，返回`)
         const signParam = calculateSignParam(tickeString, url)
         ctx.body = okResponse(signParam)
         logger.info("-------------------[接入方服务端鉴权处理 END]-----------------------------\n")
@@ -154,10 +205,12 @@ async function getSignParameters(ctx) {
         return
     }
 
-    logger.info(`接入服务方第⑤ 步: 获得颁发的JSAPI临时授权凭证，更新到Cookie`)
+    logger.info(`接入服务方第⑤ 步: 获得颁发的JSAPI临时授权凭证，更新到Cookie和Redis`)
     const newTicketString = ticketRes.data.data.ticket || ""
     if (newTicketString.length > 0) {
         setCookie(ctx, LJ_JSTICKET_KEY, newTicketString)
+        // 存储到Redis，jsapi_ticket的有效期通常为7200秒
+        await setAuthInfo(`${REDIS_PREFIX}jsapi_ticket`, newTicketString, 7200)
     }
 
     logger.info(`接入服务方第⑥ 步: 计算出JSAPI鉴权参数，并返回给前端`)

@@ -11,11 +11,14 @@ import { getUserAccessToken, getSignParameters } from './feishuapi/feishuAuth.js
 import dbAdapter from './db/db_adapter.js';
 import { handleFrontendLogs } from './util/logHandler.js';
 import { initializeAdminUserid } from './util/adminUseridManager.js';
+import { initRedis } from './util/redisManager.js';
 
 // 初始化数据库
 dbAdapter.initDatabase().then(async () => {
   // 初始化ADMIN_USERID
   await initializeAdminUserid();
+  // 初始化Redis
+  await initRedis();
 });
 
 // Start Server
