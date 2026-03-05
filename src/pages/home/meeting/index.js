@@ -413,7 +413,7 @@ function MeetingList(props) {
       <div style={{ padding: 24, background: '#fff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24 }}>
           <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
-          {!isFreeAccount() && (
+          {userAccountInfo && !isFreeAccount() && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button type="primary" className="reserve-button" onClick={showModal}>预定会议</Button>
             </div>
