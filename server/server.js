@@ -10,9 +10,13 @@ import { handleGenerateJoinScheme, handleGenerateJumpUrl, handleGenerateJoinUrl 
 import { getUserAccessToken, getSignParameters } from './feishuapi/feishuAuth.js';
 import dbAdapter from './db/db_adapter.js';
 import { handleFrontendLogs } from './util/logHandler.js';
+import { initializeAdminUserid } from './util/adminUseridManager.js';
 
 // 初始化数据库
-dbAdapter.initDatabase();
+dbAdapter.initDatabase().then(async () => {
+  // 初始化ADMIN_USERID
+  await initializeAdminUserid();
+});
 
 // Start Server
 const app = new Koa()

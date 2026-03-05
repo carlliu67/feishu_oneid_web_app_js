@@ -5,6 +5,7 @@ import { configAccessControl, okResponse, failResponse } from '../server_util.js
 import serverConfig from '../config/server_config.js';
 import { isLogin, getUserid } from '../feishuapi/feishuAuth.js';
 import { batchGetUserInfo } from '../feishuapi/feishuUtil.js';
+import { getAdminUserid, updateAdminUserid } from '../util/adminUseridManager.js';
 
 const LJ_TOKEN_KEY = 'lk_token';
 const WEMEET_VERSION = 'wemeet-feishu-js/v1.0.1'
@@ -360,9 +361,9 @@ async function handleGetUserInfo(ctx) {
     }
 
     const userid = getUserid(ctx);
-    const operator_id = serverConfig.adminUserid || userid;
-    const uri = `/v1/users/${userid}?operator_id=${operator_id}&operator_id_type=1`;
-    const requestConfig = createRequestConfig('GET', uri);
+    let operator_id = getAdminUserid();
+    let uri = `/v1/users/${userid}?operator_id=${operator_id}&operator_id_type=1`;
+    let requestConfig = createRequestConfig('GET', uri);
 
     try {
         logger.debug("获取用户详情请求配置: ", requestConfig);
@@ -375,7 +376,41 @@ async function handleGetUserInfo(ctx) {
     } catch (error) {
         handleApiError(error, '获取用户详情');
         logger.warn("获取用户详情请求配置: ", requestConfig);
-        throw error;
+        
+        // 如果使用ADMIN_USERID失败，尝试使用当前用户的userid
+        if (operator_id !== userid) {
+            logger.info("使用ADMIN_USERID失败，尝试使用当前用户的userid");
+            operator_id = userid;
+            uri = `/v1/users/${userid}?operator_id=${operator_id}&operator_id_type=1`;
+            requestConfig = createRequestConfig('GET', uri);
+            
+            try {
+                logger.debug("使用当前用户userid获取用户详情请求配置: ", requestConfig);
+                
+                const response = await axios(requestConfig);
+                logger.debug("使用当前用户userid获取用户详情结果: ", response.data);
+                
+                // 如果使用当前用户的userid成功，更新ADMIN_USERID
+                await updateAdminUserid(userid);
+                
+                logger.debug("-------------------[获取用户详情 END]-----------------------------");
+                ctx.body = okResponse(response.data);
+                return;
+            } catch (secondError) {
+                handleApiError(secondError, '使用当前用户userid获取用户详情');
+                logger.warn("使用当前用户userid获取用户详情请求配置: ", requestConfig);
+                logger.error("请求会议接口时出错: ", secondError.response?.data || { message: '内部服务器错误' });
+                ctx.status = secondError.response?.status || 500;
+                ctx.body = failResponse(secondError.response?.data || { message: '内部服务器错误' });
+                return;
+            }
+        } else {
+            // 如果已经是使用当前用户的userid，返回错误
+            logger.error("请求会议接口时出错: ", error.response?.data || { message: '内部服务器错误' });
+            ctx.status = error.response?.status || 500;
+            ctx.body = failResponse(error.response?.data || { message: '内部服务器错误' });
+            return;
+        }
     }
 }
 
