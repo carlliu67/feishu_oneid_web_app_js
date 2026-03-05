@@ -9,5 +9,6 @@ services:
       - PORT=9001
     volumes:
       - ./data:/app/data
+      - ./logs:/app/logs
       - .env:/app/.env
     restart: unless-stopped
