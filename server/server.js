@@ -5,7 +5,7 @@ import serverConfig from './config/server_config.js';
 import bodyParser from 'koa-bodyparser';
 import { logger } from './util/logger.js';
 import { handleVerification, handleEvent } from './wemeet/webhook.js';
-import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList } from './wemeet/wemeetApi.js';
+import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList, handleGetUserInfo } from './wemeet/wemeetApi.js';
 import { handleGenerateJoinScheme, handleGenerateJumpUrl, handleGenerateJoinUrl } from './wemeet/wemeetUtil.js';
 import { getUserAccessToken, getSignParameters } from './feishuapi/feishuAuth.js';
 import dbAdapter from './db/db_adapter.js';
@@ -45,6 +45,7 @@ router.get(serverConfig.getSignParametersPath, getSignParameters)
 router.post(serverConfig.createMeetingPath, handleCreateMeeting)
 router.get(serverConfig.queryUserEndedMeetingListPath, handleQueryUserEndedMeetingList)
 router.get(serverConfig.queryUserMeetingListPath, handleQueryUserMeetingList)
+router.get(serverConfig.getUserInfoPath, handleGetUserInfo)
 router.get(serverConfig.generateJoinSchemePath, handleGenerateJoinScheme)
 router.get(serverConfig.generateJumpUrlPath, handleGenerateJumpUrl)
 router.get(serverConfig.generateJoinUrlPath, handleGenerateJoinUrl)

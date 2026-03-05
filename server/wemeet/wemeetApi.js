@@ -345,10 +345,45 @@ async function handleQueryUserMeetingList(ctx) {
     }
 }
 
+/**
+ * 处理获取用户详情请求
+ * @param {Object} ctx - Koa上下文
+ */
+async function handleGetUserInfo(ctx) {
+    logger.debug("\n-------------------[获取用户详情 BEGIN]-----------------------------");
+    configAccessControl(ctx);
+    
+    if (isLogin(ctx) === false) {
+        ctx.body = failResponse("用户未登录，请先登录");
+        logger.debug("-------------------[获取用户详情 用户未登录 END]-----------------------------");
+        return;
+    }
+
+    const userid = getUserid(ctx);
+    const operator_id = serverConfig.adminUserid || userid;
+    const uri = `/v1/users/${userid}?operator_id=${operator_id}&operator_id_type=1`;
+    const requestConfig = createRequestConfig('GET', uri);
+
+    try {
+        logger.debug("获取用户详情请求配置: ", requestConfig);
+        
+        const response = await axios(requestConfig);
+        logger.debug("获取用户详情结果: ", response.data);
+        logger.debug("-------------------[获取用户详情 END]-----------------------------");
+        ctx.body = okResponse(response.data);
+        return;
+    } catch (error) {
+        handleApiError(error, '获取用户详情');
+        logger.warn("获取用户详情请求配置: ", requestConfig);
+        throw error;
+    }
+}
+
 export {
     handleCreateMeeting,
     handleQueryUserEndedMeetingList,
     handleQueryUserMeetingList,
+    handleGetUserInfo,
     queryMeetingById,
     queryMeetingRecordList,
     queryMeetingRecordAddress,

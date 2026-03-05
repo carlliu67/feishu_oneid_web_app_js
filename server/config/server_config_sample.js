@@ -22,6 +22,7 @@ const config = {
     wemeetWebhookAESKey: process.env.WEMEET_WEBHOOK_AESKEY || "",   //腾讯会议webhook回调AES密钥
     wemeetSSOURL: process.env.WEMEET_SSOURL || "",   //腾讯会议IDaaS/Oneid免登链接前缀地址，需要替换成自己所在环境的地址
     wemeetRestAPIServerUrl: "https://api.meeting.qq.com",   //腾讯会议API应用服务地址，不需要替换
+    adminUserid: process.env.ADMIN_USERID || "",   //管理员用户ID，用于调用腾讯会议API
 
     // app server接口配置，这部分参数不要修改
     getUserAccessTokenPath:  "/api/get_user_access_token", //免登-获取user_access_token的api path
@@ -29,6 +30,7 @@ const config = {
     createMeetingPath:  "/api/create_meeting", //创建会议的api path
     queryUserEndedMeetingListPath:  "/api/query_user_ended_meeting_list", //获取用户已结束会议列表的api path
     queryUserMeetingListPath:  "/api/query_user_meeting_list", //获取用户会议列表的api path
+    getUserInfoPath:  "/api/get_user_info", //获取用户信息的api path
     generateJoinSchemePath:  "/api/generateJoinScheme", //获取scheme url的api path
     generateJumpUrlPath:  "/api/generateJumpUrl", //获取免登跳转url的api path
     generateJoinUrlPath:  "/api/generateJoinUrl", //获取免登入会url的api path
