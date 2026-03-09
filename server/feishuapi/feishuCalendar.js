@@ -29,7 +29,8 @@ async function getCalendarList(tenant_access_token) {
 // 获取应用主日历ID
 function getPrimaryCalendarId(calendar_list) {
     const data = Array.from(calendar_list);
-    const targetElement = data.find(item => item.summary === serverConfig.feishuAppName && item.type === 'primary');
+    // const targetElement = data.find(item => item.summary === serverConfig.feishuAppName && item.type === 'primary');
+    const targetElement = data.find(item => item.type === 'primary');
     const calendarId = targetElement ? targetElement.calendar_id : null;
     return calendarId;
 }
