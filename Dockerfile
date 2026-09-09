@@ -24,7 +24,8 @@ RUN sed -i -E 's/[[:space:]]+#.*$//' .env
 # 由示例生成前端配置文件（如需自定义配置，可在本地修改 src/config/client_config_sample.js）
 RUN cp src/config/client_config_sample.js src/config/client_config.js
 
-# 构建前端应用
+# 构建前端应用（生产环境关闭sourcemap，减小产物体积）
+ENV GENERATE_SOURCEMAP=false
 RUN npm run build
 
 # 第二阶段：构建后端应用并运行

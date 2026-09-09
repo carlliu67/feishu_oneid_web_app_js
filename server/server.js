@@ -3,6 +3,7 @@ import Router from 'koa-router';
 import session from 'koa-session';
 import serverConfig from './config/server_config.js';
 import bodyParser from 'koa-bodyparser';
+import compress from 'koa-compress';
 import serve from 'koa-static';
 import path from 'path';
 import fs from 'fs/promises';
@@ -43,6 +44,8 @@ const koaSessionConfig = {
 app.use(session(koaSessionConfig, app));
 // 使用 koa-bodyparser 中间件
 app.use(bodyParser());
+// 开启响应压缩（gzip/br），超过1KB的文本响应才压缩
+app.use(compress({ threshold: 1024, br: true }));
 
 // 处理OPTIONS预检请求
 router.options('/api/:path*', (ctx) => {
@@ -80,7 +83,17 @@ app.use(router.routes()).use(router.allowedMethods());
 // 前后端同端口部署：托管前端静态资源（build 目录）
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const buildDir = path.join(__dirname, '../build');
-app.use(serve(buildDir));
+const staticDir = path.join(buildDir, 'static') + path.sep;
+app.use(serve(buildDir, {
+    // 带hash的静态资源长缓存（一年、immutable）；其余文件（index.html等）协商缓存
+    setHeaders: (res, filePath) => {
+        if (filePath.startsWith(staticDir)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    }
+}));
 
 // SPA fallback：非 /api 且未匹配静态文件的 GET 请求返回 index.html
 const indexPath = path.join(buildDir, 'index.html');
@@ -88,6 +101,7 @@ app.use(async (ctx) => {
     if (ctx.method === 'GET' && !ctx.path.startsWith('/api/')) {
         try {
             ctx.type = 'html';
+            ctx.set('Cache-Control', 'no-cache');
             ctx.body = await fs.readFile(indexPath);
         } catch (err) {
             ctx.status = 404;
