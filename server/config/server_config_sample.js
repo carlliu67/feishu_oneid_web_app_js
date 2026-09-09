@@ -11,7 +11,7 @@ const config = {
     calendarSwitch: true, //预约普通会议是是否创建钉钉日程，对周期会议不生效，周期会议固定会创建日程
 
     // server运行参数配置
-    apiPort: process.env.API_PORT || "9001",   //后端指定端口
+    apiPort: process.env.API_PORT || "9000",   //服务端口（前后端共用）
 
     // 腾讯会议对接参数
     wemeetAPPID: process.env.WEMEET_APPID || "",   //腾讯会议应用APPID

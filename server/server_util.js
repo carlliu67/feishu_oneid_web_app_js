@@ -23,7 +23,12 @@ function okResponse(data) {
 // 处理跨域问题
 //【特别说明】：该部分实现仅在线下用。【线上环境】需要对敏感信息接口服务端返回的跨域头部进行严格限制，避免任何域都能跨域访问此接口。
 function configAccessControl(ctx) {
-    ctx.set("Access-Control-Allow-Origin", ctx.headers.origin);
+    const origin = ctx.headers.origin;
+    if (!origin) {
+        // 同源请求不携带Origin头，无需设置CORS响应头
+        return;
+    }
+    ctx.set("Access-Control-Allow-Origin", origin);
     ctx.set("Access-Control-Allow-Methods", "OPTIONS, GET, PUT, POST, DELETE");
     ctx.set("Access-Control-Allow-Credentials", "true");  // 表示是否允许发送Cookie
     ctx.set("Access-Control-Allow-Headers", "x-requested-with, accept, origin, content-type");

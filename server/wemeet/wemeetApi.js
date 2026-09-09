@@ -8,7 +8,7 @@ import { batchGetUserInfo } from '../feishuapi/feishuUtil.js';
 import { getAdminUserid, updateAdminUserid } from '../util/adminUseridManager.js';
 
 const LJ_TOKEN_KEY = 'lk_token';
-const WEMEET_VERSION = 'wemeet-feishu-js/v1.0.1'
+const WEMEET_VERSION = 'wemeet-feishu-js/v1.1.0'
 
 /**
  * 生成签名函数
@@ -89,9 +89,13 @@ function createRequestConfig(method, uri, body = '') {
  */
 function handleApiError(error, apiName) {
     if (error.response) {
-        logger.error(`${apiName} 服务器响应错误: `, error.response.status, error.response.data);
+        // 只打印响应状态、响应头和响应body
+        logger.error(`${apiName} API请求失败 status=${error.response.status}`);
+        logger.error(`${apiName} 响应头: `, error.response.headers);
+        logger.error(`${apiName} 响应body: `, error.response.data);
     } else if (error.request) {
-        logger.error(`${apiName} 未收到服务器响应: `, error.request);
+        // 请求已发出但未收到响应，只打印简要错误信息
+        logger.error(`${apiName} 未收到服务器响应: ${error.code || ''} ${error.message}`);
     } else {
         logger.error(`${apiName} 请求设置时出错: `, error.message);
     }
@@ -115,7 +119,6 @@ async function queryMeetingById(meetingId, userid) {
         return response.data;
     } catch (error) {
         handleApiError(error, '查询会议');
-        logger.warn("查询会议请求失败: ", requestConfig);
         throw error;
     }
 }
@@ -139,7 +142,6 @@ async function queryMeetingRecordList(webhookMeetingInfo) {
         return response.data;
     } catch (error) {
         handleApiError(error, '查询会议录制列表');
-        logger.warn("查询会议录制列表请求失败: ", requestConfig);
         throw error;
     }
 }
@@ -163,7 +165,6 @@ async function queryMeetingRecordAddress(meeting_record_id, userid) {
         return response.data;
     } catch (error) {
         handleApiError(error, '查询会议录制地址');
-        logger.warn("查询会议录制地址请求失败: ", requestConfig);
         throw error;
     }
 }
@@ -186,7 +187,6 @@ async function queryMeetingParticipants(meeting_id, userid) {
         return response.data;
     } catch (error) {
         handleApiError(error, '获取参会成员明细');
-        logger.warn("获取参会成员明细请求失败: ", requestConfig);
         throw error;
     }
 }
@@ -244,7 +244,6 @@ async function handleCreateMeeting(ctx) {
         const response = await axios(requestConfig);
         ctx.body = okResponse(response.data);
     } catch (error) {
-        logger.warn("创建会议请求参数: ", requestConfig);
         if (error instanceof SyntaxError) {
             logger.error("解析请求body数据时出错: ", error);
             ctx.body = failResponse("请求数据格式错误");
@@ -297,7 +296,6 @@ async function handleQueryUserEndedMeetingList(ctx) {
         return;
     } catch (error) {
         handleApiError(error, '查询用户已结束会议列表');
-        logger.warn("查询用户已结束会议列表请求配置: ", requestConfig);
         throw error;
     }
 }
@@ -341,7 +339,6 @@ async function handleQueryUserMeetingList(ctx) {
         return;
     } catch (error) {
         handleApiError(error, '查询用户会议列表');
-        logger.warn("查询用户会议列表请求配置: ", requestConfig);
         throw error;
     }
 }
@@ -375,8 +372,7 @@ async function handleGetUserInfo(ctx) {
         return;
     } catch (error) {
         handleApiError(error, '获取用户详情');
-        logger.warn("获取用户详情请求配置: ", requestConfig);
-        
+
         // 如果使用ADMIN_USERID失败，尝试使用当前用户的userid
         if (operator_id !== userid) {
             logger.info("使用ADMIN_USERID失败，尝试使用当前用户的userid");
@@ -398,7 +394,6 @@ async function handleGetUserInfo(ctx) {
                 return;
             } catch (secondError) {
                 handleApiError(secondError, '使用当前用户userid获取用户详情');
-                logger.warn("使用当前用户userid获取用户详情请求配置: ", requestConfig);
                 logger.error("请求会议接口时出错: ", secondError.response?.data || { message: '内部服务器错误' });
                 ctx.status = secondError.response?.status || 500;
                 ctx.body = failResponse(secondError.response?.data || { message: '内部服务器错误' });

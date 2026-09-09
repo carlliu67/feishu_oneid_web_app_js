@@ -11,39 +11,6 @@
 - **数据库**：MySQL / SQLite
 - **集成**：飞书API, 腾讯会议API
 
-## 快速开始
-
-### 环境要求
-
-- Node.js 18+
-- npm 8+
-- Docker (可选，用于容器化部署)
-
-### 本地开发
-
-1. **安装依赖**
-
-```bash
-npm install
-```
-
-2. **配置环境变量**
-
-复制 `.env.example` 文件为 `.env` 并填写相关配置：
-
-```bash
-cp .env.example .env
-# 编辑 .env 文件，填写必要的配置信息
-```
-
-3. **启动开发服务器**
-
-```bash
-npm start
-```
-
-前端应用将运行在 `http://localhost:9000`，后端服务将运行在 `http://localhost:9001`。
-
 ## Docker部署
 
 ### 环境要求
@@ -65,12 +32,12 @@ cp .env.example .env
 2. **构建和启动服务**
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
 3. **访问应用**
 
-应用将运行在 `http://localhost:9000`，后端API将运行在 `http://localhost:9001`。
+应用与后端API统一运行在 `http://localhost:9000`（单进程同端口部署，前端页面和 `/api/*` 接口均由此端口提供）。
 
 ### 服务管理
 
@@ -128,11 +95,11 @@ docker compose restart
 
 ### 前端配置
 
-- `APPID`：应用ID
-- `APP_NAME`：应用名称
-- `SERVER_URL`：服务器URL
-- `SERVER_PROTOCOL`：服务器协议（http/https）
-- `API_PORT`：API端口
+- `REACT_APP_APPID`：应用ID
+- `REACT_APP_APP_NAME`：应用名称
+- `REACT_APP_SERVER_URL`：服务器URL
+- `REACT_APP_SERVER_PROTOCOL`：服务器协议（http/https）
+- `REACT_APP_API_PORT`：API端口
 
 ### 后端配置
 
@@ -161,8 +128,7 @@ docker compose restart
 3. **数据库配置**：使用Docker部署时，默认使用外部MySQL数据库服务，需要在 `.env` 文件中配置数据库连接信息。
 
 4. **端口配置**：默认使用以下端口：
-   - 前端应用：9000
-   - 后端API：9001
+   - 应用与API（前后端共用）：9000
    - MySQL数据库：3306
 
 ## 故障排查
@@ -174,6 +140,8 @@ docker compose restart
 2. **API调用失败**：检查飞书和腾讯会议的API配置是否正确，确保App ID和Secret有效。
 
 3. **数据库连接失败**：检查数据库服务是否正常运行，连接信息是否正确。
+
+4. **构建失败（sqlite3编译报错）**：镜像内已配置大陆镜像源并安装编译工具链，若仍失败，请检查容器网络是否可访问 `mirrors.ustc.edu.cn` 和 `registry.npmmirror.com`。
 
 ### 日志查看
 

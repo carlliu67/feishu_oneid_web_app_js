@@ -164,10 +164,11 @@ function requestUserAccessToken(code, complete) {
 export function getOrigin(apiPort) {
     // console.log('process.env', process.env)
     if (clientConfig.serverUrl && clientConfig.serverUrl.length > 0) {
+        // 前后端分离部署时，通过 serverUrl 指定后端地址
         return clientConfig.serverProtocol + `://${clientConfig.serverUrl}:${apiPort}`
     } else {
-        let hostname = window.location.hostname
-        return clientConfig.serverProtocol + `://${hostname}:${apiPort}`
+        // 前后端同端口同源部署，直接使用相对路径请求
+        return ''
     }
 }
 

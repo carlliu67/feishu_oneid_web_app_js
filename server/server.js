@@ -3,6 +3,10 @@ import Router from 'koa-router';
 import session from 'koa-session';
 import serverConfig from './config/server_config.js';
 import bodyParser from 'koa-bodyparser';
+import serve from 'koa-static';
+import path from 'path';
+import fs from 'fs/promises';
+import { fileURLToPath } from 'url';
 import { logger } from './util/logger.js';
 import { handleVerification, handleEvent } from './wemeet/webhook.js';
 import { handleCreateMeeting, handleQueryUserEndedMeetingList, handleQueryUserMeetingList, handleGetUserInfo } from './wemeet/wemeetApi.js';
@@ -72,6 +76,25 @@ router.get(serverConfig.keepAlivePath, (ctx) => {
 // 注册路由
 const port = process.env.PORT || serverConfig.apiPort;
 app.use(router.routes()).use(router.allowedMethods());
+
+// 前后端同端口部署：托管前端静态资源（build 目录）
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const buildDir = path.join(__dirname, '../build');
+app.use(serve(buildDir));
+
+// SPA fallback：非 /api 且未匹配静态文件的 GET 请求返回 index.html
+const indexPath = path.join(buildDir, 'index.html');
+app.use(async (ctx) => {
+    if (ctx.method === 'GET' && !ctx.path.startsWith('/api/')) {
+        try {
+            ctx.type = 'html';
+            ctx.body = await fs.readFile(indexPath);
+        } catch (err) {
+            ctx.status = 404;
+            ctx.body = 'Frontend build not found';
+        }
+    }
+});
 
 app.listen(port, () => {
     logger.info(`server is start, listening on port ${port}`);

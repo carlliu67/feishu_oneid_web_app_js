@@ -443,7 +443,8 @@ async function processWebhookEvent(eventData) {
                 logger.warn(`不支持的事件类型: ${eventData.event}`);
         }
     } catch (error) {
-        logger.error(`处理webhook事件失败 - ${eventData.event || 'Unknown'}`, error);
+        // API错误详情已在handleApiError中打印，这里只记录简要信息
+        logger.error(`处理webhook事件失败 - ${eventData.event || 'Unknown'}: ${error.message}`);
     }
 }
 
@@ -515,10 +516,10 @@ async function handleEvent(ctx) {
             { eventType, timestamp }
         ).catch(error => {
             // 任务队列添加失败时记录错误
-            logger.error(`将webhook事件添加到任务队列失败 - ${eventType}`, error);
+            logger.error(`将webhook事件添加到任务队列失败 - ${eventType}: ${error.message}`);
         });
     } catch (error) {
-        logger.error('Webhook请求处理失败', error);
+        logger.error(`Webhook请求处理失败: ${error.message}`);
         ctx.status = 500;
         ctx.body = `Event processing failed: ${error.message}`;
     }

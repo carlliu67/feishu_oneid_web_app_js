@@ -34,7 +34,7 @@ async function initRedis() {
     redisClient = new Redis(redisOptions);
     
     redisClient.on('error', (err) => {
-      logger.error('Redis connection error:', err);
+      logger.error(`Redis connection error: ${err.message}`);
     });
     
     redisClient.on('connect', () => {
@@ -50,7 +50,7 @@ async function initRedis() {
     logger.info('Redis initialization successful');
     return redisClient;
   } catch (error) {
-    logger.error('Failed to initialize Redis:', error);
+    logger.error(`Failed to initialize Redis: ${error.message}`);
     // 如果Redis连接失败，不影响应用启动，只是会回退到使用Session和Cookie
     return null;
   }
@@ -61,17 +61,22 @@ function getRedisClient() {
   return redisClient;
 }
 
+// 检查Redis连接是否就绪（客户端存在且状态为ready）
+function isRedisReady() {
+  return !!(redisClient && redisClient.status === 'ready');
+}
+
 // 设置鉴权信息到Redis
 async function setAuthInfo(key, value, expiration = 7200) { // 默认2小时过期
   try {
-    if (!redisClient) {
+    if (!isRedisReady()) {
       return false;
     }
     await redisClient.setex(key, expiration, JSON.stringify(value));
     logger.debug(`Auth info set to Redis: ${key}`);
     return true;
   } catch (error) {
-    logger.error('Error setting auth info to Redis:', error);
+    logger.error(`Error setting auth info to Redis: ${error.message}`);
     return false;
   }
 }
@@ -79,7 +84,7 @@ async function setAuthInfo(key, value, expiration = 7200) { // 默认2小时过�
 // 从Redis获取鉴权信息
 async function getAuthInfo(key) {
   try {
-    if (!redisClient) {
+    if (!isRedisReady()) {
       return null;
     }
     const value = await redisClient.get(key);
@@ -89,7 +94,7 @@ async function getAuthInfo(key) {
     }
     return null;
   } catch (error) {
-    logger.error('Error getting auth info from Redis:', error);
+    logger.error(`Error getting auth info from Redis: ${error.message}`);
     return null;
   }
 }
@@ -97,14 +102,14 @@ async function getAuthInfo(key) {
 // 从Redis删除鉴权信息
 async function deleteAuthInfo(key) {
   try {
-    if (!redisClient) {
+    if (!isRedisReady()) {
       return false;
     }
     await redisClient.del(key);
     logger.debug(`Auth info deleted from Redis: ${key}`);
     return true;
   } catch (error) {
-    logger.error('Error deleting auth info from Redis:', error);
+    logger.error(`Error deleting auth info from Redis: ${error.message}`);
     return false;
   }
 }
@@ -112,6 +117,7 @@ async function deleteAuthInfo(key) {
 export {
   initRedis,
   getRedisClient,
+  isRedisReady,
   setAuthInfo,
   getAuthInfo,
   deleteAuthInfo
